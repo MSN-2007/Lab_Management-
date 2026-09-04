@@ -994,6 +994,161 @@ def reports_view():
                            columns=columns,
                            results=results)
 
+# ------------------------------------------------------------------------------
+# 11. REQUISITIONS & MODULE PROCUREMENT (Things to Order & Buy Links)
+# ------------------------------------------------------------------------------
+@app.route('/procurement')
+@login_required
+def procurement_list():
+    status_filter = request.args.get('status', '')
+    priority_filter = request.args.get('priority', '')
+    search = request.args.get('q', '').strip()
+
+    sql = """
+        SELECT r.*, u.full_name AS requester_name, c.available_quantity, c.minimum_stock, c.storage_bin
+        FROM REQUISITIONS r
+        LEFT JOIN USERS u ON r.requested_by = u.user_id
+        LEFT JOIN COMPONENTS c ON r.component_id = c.component_id
+        WHERE 1=1
+    """
+    params = []
+    if status_filter:
+        sql += " AND r.status = %s"
+        params.append(status_filter)
+    if priority_filter:
+        sql += " AND r.priority = %s"
+        params.append(priority_filter)
+    if search:
+        sql += " AND (r.item_name LIKE %s OR r.category_name LIKE %s OR r.vendor_name_1 LIKE %s)"
+        term = f"%{search}%"
+        params.extend([term, term, term])
+
+    sql += " ORDER BY CASE r.priority WHEN 'Critical' THEN 1 WHEN 'High' THEN 2 WHEN 'Medium' THEN 3 ELSE 4 END, r.requisition_id DESC"
+
+    requisitions = query_db(sql, params)
+
+    all_components = query_db("SELECT component_id, component_name, available_quantity, minimum_stock, unit_cost FROM COMPONENTS ORDER BY component_name ASC")
+    low_stock_items = query_db("SELECT * FROM COMPONENTS WHERE available_quantity <= minimum_stock ORDER BY available_quantity ASC")
+
+    total_orders = len(requisitions)
+    pending_count = sum(1 for r in requisitions if r['status'] == 'Pending Order')
+    in_transit_count = sum(1 for r in requisitions if r['status'] in ['Ordered', 'In Transit'])
+    total_est_cost = sum((r['required_quantity'] or 0) * float(r['estimated_unit_cost'] or 0) for r in requisitions if r['status'] != 'Cancelled')
+
+    return render_template('procurement.html',
+                           requisitions=requisitions,
+                           all_components=all_components,
+                           low_stock_items=low_stock_items,
+                           selected_status=status_filter,
+                           selected_priority=priority_filter,
+                           search=search,
+                           total_orders=total_orders,
+                           pending_count=pending_count,
+                           in_transit_count=in_transit_count,
+                           total_est_cost=total_est_cost)
+
+@app.route('/procurement/add', methods=['POST'])
+@login_required
+def procurement_add():
+    user = get_current_user()
+    comp_id = request.form.get('component_id', '').strip() or None
+    item_name = request.form.get('item_name', '').strip()
+    category_name = request.form.get('category_name', 'Microcontrollers & Sensors').strip()
+    required_qty = int(request.form.get('required_quantity', 1))
+    est_cost = float(request.form.get('estimated_unit_cost', 0.0))
+    priority = request.form.get('priority', 'Medium')
+    
+    vendor_1 = request.form.get('vendor_name_1', 'Robu.in').strip()
+    link_1 = request.form.get('buy_link_1', '').strip()
+    vendor_2 = request.form.get('vendor_name_2', 'ElectronicsComp').strip()
+    link_2 = request.form.get('buy_link_2', '').strip()
+    vendor_3 = request.form.get('vendor_name_3', 'Amazon India').strip()
+    link_3 = request.form.get('buy_link_3', '').strip()
+    notes = request.form.get('notes', '').strip()
+    requester_id = user['user_id'] if user else 1
+
+    if not item_name:
+        flash("Item/Module name is required.", 'danger')
+        return redirect(url_for('procurement_list'))
+
+    try:
+        execute_db("""
+            INSERT INTO REQUISITIONS (component_id, item_name, category_name, required_quantity, estimated_unit_cost, priority, status, vendor_name_1, buy_link_1, vendor_name_2, buy_link_2, vendor_name_3, buy_link_3, notes, requested_by)
+            VALUES (%s, %s, %s, %s, %s, %s, 'Pending Order', %s, %s, %s, %s, %s, %s, %s, %s)
+        """, [comp_id, item_name, category_name, required_qty, est_cost, priority, vendor_1, link_1, vendor_2, link_2, vendor_3, link_3, notes, requester_id])
+        flash(f"Order request for '{item_name}' (Qty: {required_qty}) submitted successfully!", 'success')
+    except Exception as e:
+        flash(f"Error creating order request: {str(e)}", 'danger')
+
+    return redirect(url_for('procurement_list'))
+
+@app.route('/procurement/quick-add/<component_id>', methods=['POST'])
+@login_required
+def procurement_quick_add(component_id):
+    user = get_current_user()
+    comp = query_db("SELECT * FROM COMPONENTS WHERE component_id = %s", [component_id], one=True)
+    if not comp:
+        flash("Component not found.", 'danger')
+        return redirect(url_for('procurement_list'))
+
+    reorder_qty = max(comp['minimum_stock'] * 2 - comp['available_quantity'], 5)
+    item_name = comp['component_name']
+    
+    import urllib.parse
+    encoded_query = urllib.parse.quote_plus(item_name)
+    link_robu = f"https://robu.in/?s={encoded_query}&post_type=product"
+    link_ecomp = f"https://www.electronicscomp.com/index.php?route=product/search&search={encoded_query}"
+    link_amazon = f"https://www.amazon.in/s?k={encoded_query}"
+
+    try:
+        execute_db("""
+            INSERT INTO REQUISITIONS (component_id, item_name, category_name, required_quantity, estimated_unit_cost, priority, status, vendor_name_1, buy_link_1, vendor_name_2, buy_link_2, vendor_name_3, buy_link_3, notes, requested_by)
+            VALUES (%s, %s, %s, %s, %s, 'High', 'Pending Order', 'Robu.in', %s, 'ElectronicsComp', %s, 'Amazon India', %s, %s, %s)
+        """, [component_id, item_name, 'Electronics Restock', reorder_qty, comp['unit_cost'], link_robu, link_ecomp, link_amazon, f"Auto-generated restock requisition for low stock ({comp['available_quantity']} units remaining).", user['user_id'] if user else 1])
+        flash(f"Quick re-order request generated for '{item_name}' with 3 buy links!", 'success')
+    except Exception as e:
+        flash(f"Error creating quick order: {str(e)}", 'danger')
+
+    return redirect(url_for('procurement_list'))
+
+@app.route('/procurement/status/<int:requisition_id>', methods=['POST'])
+@login_required
+def procurement_update_status(requisition_id):
+    new_status = request.form.get('status')
+    r = query_db("SELECT * FROM REQUISITIONS WHERE requisition_id = %s", [requisition_id], one=True)
+    if not r:
+        flash("Requisition item not found.", 'danger')
+        return redirect(url_for('procurement_list'))
+
+    try:
+        execute_db("UPDATE REQUISITIONS SET status = %s WHERE requisition_id = %s", [new_status, requisition_id])
+        
+        if new_status == 'Received' and r['component_id']:
+            execute_db("""
+                UPDATE COMPONENTS 
+                SET total_quantity = total_quantity + %s,
+                    available_quantity = available_quantity + %s
+                WHERE component_id = %s
+            """, [r['required_quantity'], r['required_quantity'], r['component_id']])
+            flash(f"Order #{requisition_id} marked as Received! Added {r['required_quantity']} units to component stock ({r['component_id']}).", 'success')
+        else:
+            flash(f"Requisition #{requisition_id} status updated to '{new_status}'.", 'success')
+    except Exception as e:
+        flash(f"Error updating status: {str(e)}", 'danger')
+
+    return redirect(url_for('procurement_list'))
+
+@app.route('/procurement/delete/<int:requisition_id>', methods=['POST'])
+@login_required
+def procurement_delete(requisition_id):
+    try:
+        execute_db("DELETE FROM REQUISITIONS WHERE requisition_id = %s", [requisition_id])
+        flash(f"Order item #{requisition_id} deleted.", 'info')
+    except Exception as e:
+        flash(f"Error deleting requisition: {str(e)}", 'danger')
+
+    return redirect(url_for('procurement_list'))
+
 if __name__ == '__main__':
     print("=" * 60)
     print("RoboLab: Robotics Lab Management System Started")

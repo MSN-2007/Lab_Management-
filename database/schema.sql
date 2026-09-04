@@ -10,6 +10,7 @@ USE robotics_lab;
 -- 1. ROLES TABLE
 -- ------------------------------------------------------------------------------
 DROP TABLE IF EXISTS NOTIFICATIONS;
+DROP TABLE IF EXISTS REQUISITIONS;
 DROP TABLE IF EXISTS CALIBRATIONS;
 DROP TABLE IF EXISTS MAINTENANCE_JOBS;
 DROP TABLE IF EXISTS BREAKDOWNS;
@@ -290,6 +291,31 @@ CREATE TABLE NOTIFICATIONS (
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES USERS(user_id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+-- ------------------------------------------------------------------------------
+-- 19. REQUISITIONS & MODULE PROCUREMENT TABLE
+-- ------------------------------------------------------------------------------
+CREATE TABLE REQUISITIONS (
+    requisition_id INT AUTO_INCREMENT PRIMARY KEY,
+    component_id VARCHAR(20),
+    item_name VARCHAR(150) NOT NULL,
+    category_name VARCHAR(100) DEFAULT 'Electronics',
+    required_quantity INT NOT NULL DEFAULT 1,
+    estimated_unit_cost DECIMAL(10, 2) DEFAULT 0.00,
+    priority ENUM('Critical', 'High', 'Medium', 'Low') DEFAULT 'Medium',
+    status ENUM('Pending Order', 'Approved', 'Ordered', 'In Transit', 'Received', 'Cancelled') DEFAULT 'Pending Order',
+    vendor_name_1 VARCHAR(100) DEFAULT 'Robu.in',
+    buy_link_1 TEXT,
+    vendor_name_2 VARCHAR(100) DEFAULT 'ElectronicsComp',
+    buy_link_2 TEXT,
+    vendor_name_3 VARCHAR(100) DEFAULT 'Amazon India',
+    buy_link_3 TEXT,
+    notes TEXT,
+    requested_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (component_id) REFERENCES COMPONENTS(component_id) ON UPDATE CASCADE ON DELETE SET NULL,
+    FOREIGN KEY (requested_by) REFERENCES USERS(user_id) ON UPDATE CASCADE ON DELETE SET NULL
 );
 
 -- ==============================================================================

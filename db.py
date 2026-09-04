@@ -114,6 +114,7 @@ def init_sqlite_database():
     PRAGMA foreign_keys = ON;
 
     DROP TABLE IF EXISTS NOTIFICATIONS;
+    DROP TABLE IF EXISTS REQUISITIONS;
     DROP TABLE IF EXISTS CALIBRATIONS;
     DROP TABLE IF EXISTS MAINTENANCE_JOBS;
     DROP TABLE IF EXISTS BREAKDOWNS;
@@ -344,6 +345,28 @@ def init_sqlite_database():
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES USERS(user_id)
     );
+
+    CREATE TABLE REQUISITIONS (
+        requisition_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        component_id TEXT,
+        item_name TEXT NOT NULL,
+        category_name TEXT DEFAULT 'Electronics',
+        required_quantity INTEGER NOT NULL DEFAULT 1,
+        estimated_unit_cost REAL DEFAULT 0.00,
+        priority TEXT CHECK(priority IN ('Critical', 'High', 'Medium', 'Low')) DEFAULT 'Medium',
+        status TEXT CHECK(status IN ('Pending Order', 'Approved', 'Ordered', 'In Transit', 'Received', 'Cancelled')) DEFAULT 'Pending Order',
+        vendor_name_1 TEXT DEFAULT 'Robu.in',
+        buy_link_1 TEXT,
+        vendor_name_2 TEXT DEFAULT 'ElectronicsComp',
+        buy_link_2 TEXT,
+        vendor_name_3 TEXT DEFAULT 'Amazon India',
+        buy_link_3 TEXT,
+        notes TEXT,
+        requested_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (component_id) REFERENCES COMPONENTS(component_id) ON DELETE SET NULL,
+        FOREIGN KEY (requested_by) REFERENCES USERS(user_id) ON DELETE SET NULL
+    );
     """)
 
     # Seed data
@@ -468,6 +491,14 @@ def init_sqlite_database():
     (1, 5, 'Your booking request for 6-DOF Robotic Arm (EQ001) has been approved by Dr. Arvind Menon.', 'Booking', 1, '2026-08-31 16:30:00'),
     (2, 2, 'Low stock alert: OAK-D Spatial AI Camera Module has only 1 available unit left (Min stock: 2).', 'Stock_Alert', 0, '2026-08-31 09:15:00'),
     (3, 6, 'Calibration due soon for Rigol 100MHz Oscilloscope (EQ003) on 10-Sep-2026.', 'Maintenance', 0, '2026-09-01 08:00:00');
+
+    INSERT INTO REQUISITIONS (requisition_id, component_id, item_name, category_name, required_quantity, estimated_unit_cost, priority, status, vendor_name_1, buy_link_1, vendor_name_2, buy_link_2, vendor_name_3, buy_link_3, notes, requested_by, created_at) VALUES
+    (1, 'C002', 'ESP32 Dual-Core DevKit V1 (38-Pin)', 'Microcontrollers & SBCs', 10, 380.00, 'High', 'Pending Order', 'Robu.in', 'https://robu.in/product/esp32-development-board/', 'ElectronicsComp', 'https://www.electronicscomp.com/esp32-development-board', 'Amazon India', 'https://www.amazon.in/dp/B0865V2F69', 'Required for Semester Projects & IoT Telemetry bots.', 5, '2026-09-01 10:30:00'),
+    (2, 'C007', 'MG996R Metal Gear High Torque Servo', 'Motors & Actuators', 12, 340.00, 'Critical', 'Pending Order', 'Robu.in', 'https://robu.in/product/towerpro-mg996r-high-torque-metal-gear-dual-ball-bearing-servo/', 'Robocraze', 'https://robocraze.com/products/mg996r-metal-gear-servo-motor', 'Amazon India', 'https://www.amazon.in/dp/B07DNM6QY6', 'Replacement servos for 6-DOF Robotic Arm & Grippers.', 2, '2026-09-02 11:15:00'),
+    (3, 'C004', 'HC-SR04 Ultrasonic Distance Sensor', 'Sensors', 15, 85.00, 'Medium', 'Ordered', 'ElectronicsComp', 'https://www.electronicscomp.com/hc-sr04-ultrasonic-sensor-module', 'Robu.in', 'https://robu.in/product/hc-sr04-ultrasonic-range-finder/', 'Amazon India', 'https://www.amazon.in/dp/B00EDHY50C', 'Obstacle avoidance sensors for beginner lab batches.', 3, '2026-08-30 14:00:00'),
+    (4, 'C009', 'L298N Dual H-Bridge Motor Driver Module', 'Power & Motor Drivers', 8, 120.00, 'High', 'In Transit', 'Robu.in', 'https://robu.in/product/l298n-2a-dual-motor-driver-module/', 'ElectronicsComp', 'https://www.electronicscomp.com/l298n-dual-h-bridge-motor-driver-module', 'Amazon India', 'https://www.amazon.in/dp/B07L5P6FMS', 'Replacement drivers for line follower rovers.', 2, '2026-08-28 09:45:00'),
+    (5, 'C010', 'OAK-D Spatial AI Camera Module', 'Sensors', 2, 18500.00, 'Critical', 'Pending Order', 'Robu.in', 'https://robu.in/product/luxonis-oak-d-spatial-ai-camera/', 'ElectronicsComp', 'https://www.electronicscomp.com/oak-d-spatial-ai-camera', 'Amazon India', 'https://www.amazon.in/dp/B08P1XW84R', 'Depth sensing for TurtleBot4 autonomous delivery navigation.', 4, '2026-09-03 16:20:00'),
+    (6, NULL, 'Raspberry Pi 4 Model B (8GB RAM Edition)', 'Microcontrollers & SBCs', 2, 6800.00, 'High', 'Pending Order', 'Robu.in', 'https://robu.in/product/raspberry-pi-4-model-b-with-8-gb-ram/', 'ElectronicsComp', 'https://www.electronicscomp.com/raspberry-pi-4-model-b-8gb-ram-board', 'Amazon India', 'https://www.amazon.in/dp/B0899V2R6T', 'New edge computing modules for ROS2 slam navigation.', 3, '2026-09-04 12:00:00');
     """)
     conn.commit()
     conn.close()
@@ -475,3 +506,35 @@ def init_sqlite_database():
 # Auto-seed SQLite file if needed
 if not os.path.exists(Config.SQLITE_DB_PATH):
     init_sqlite_database()
+else:
+    # Ensure REQUISITIONS table exists in existing database
+    try:
+        conn = sqlite3.connect(Config.SQLITE_DB_PATH)
+        c = conn.cursor()
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS REQUISITIONS (
+            requisition_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            component_id TEXT,
+            item_name TEXT NOT NULL,
+            category_name TEXT DEFAULT 'Electronics',
+            required_quantity INTEGER NOT NULL DEFAULT 1,
+            estimated_unit_cost REAL DEFAULT 0.00,
+            priority TEXT CHECK(priority IN ('Critical', 'High', 'Medium', 'Low')) DEFAULT 'Medium',
+            status TEXT CHECK(status IN ('Pending Order', 'Approved', 'Ordered', 'In Transit', 'Received', 'Cancelled')) DEFAULT 'Pending Order',
+            vendor_name_1 TEXT DEFAULT 'Robu.in',
+            buy_link_1 TEXT,
+            vendor_name_2 TEXT DEFAULT 'ElectronicsComp',
+            buy_link_2 TEXT,
+            vendor_name_3 TEXT DEFAULT 'Amazon India',
+            buy_link_3 TEXT,
+            notes TEXT,
+            requested_by INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (component_id) REFERENCES COMPONENTS(component_id) ON DELETE SET NULL,
+            FOREIGN KEY (requested_by) REFERENCES USERS(user_id) ON DELETE SET NULL
+        )
+        """)
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass

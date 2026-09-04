@@ -11,6 +11,10 @@
             <span>Component Stock &amp; Real-time Quantities</span>
         </div>
         <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('procurement_list') }}" class="btn btn-secondary">
+                <i class="fa-solid fa-basket-shopping"></i>
+                <span>Procurement &amp; Buy Links</span>
+            </a>
             <button class="btn btn-secondary" onclick="openModal('restockModal')">
                 <i class="fa-solid fa-cart-plus"></i>
                 <span>Restock Units</span>
@@ -59,6 +63,7 @@
                     <th>Storage Bin</th>
                     <th>Unit Cost</th>
                     <th>Stock Status</th>
+                    <th style="text-align: right;">Buy / Reorder</th>
                 </tr>
             </thead>
             <tbody>
@@ -90,6 +95,13 @@
                         {% else %}
                             <span class="badge badge-available">In Stock</span>
                         {% endif %}
+                    </td>
+                    <td style="text-align: right;">
+                        <form method="POST" action="{{ url_for('procurement_quick_add', component_id=comp.component_id) }}" style="display: inline-block;">
+                            <button type="submit" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px;" title="Create Reorder Request with Store Buy Links">
+                                <i class="fa-solid fa-cart-shopping" style="color: var(--accent-primary);"></i> Reorder
+                            </button>
+                        </form>
                     </td>
                 </tr>
                 {% else %}
