@@ -1,0 +1,298 @@
+{% extends "layout.html" %}
+
+{% block title %}Maintenance &amp; Breakdowns - RoboLab{% endblock %}
+{% block page_title %}Equipment Maintenance &amp; Incident Management{% endblock %}
+
+{% block content %}
+<!-- Action Buttons -->
+<div style="display: flex; gap: 12px; margin-bottom: 24px;">
+    <button class="btn btn-warning" onclick="openModal('reportBreakdownModal')">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>Report Breakdown Incident</span>
+    </button>
+    <button class="btn btn-primary" onclick="openModal('createMaintenanceModal')">
+        <i class="fa-solid fa-screwdriver-wrench"></i>
+        <span>Launch Maintenance Job</span>
+    </button>
+</div>
+
+<!-- Active Maintenance Jobs -->
+<div class="card-section">
+    <div class="section-header">
+        <div class="section-title">
+            <i class="fa-solid fa-wrench" style="color: var(--accent-amber);"></i>
+            <span>Active &amp; Completed Maintenance Jobs</span>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table class="table-modern">
+            <thead>
+                <tr>
+                    <th>Job ID</th>
+                    <th>Equipment</th>
+                    <th>Problem Summary</th>
+                    <th>Action Taken</th>
+                    <th>Assigned Vendor</th>
+                    <th>Start Date</th>
+                    <th>Completed Date</th>
+                    <th>Cost (₹)</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for j in jobs %}
+                <tr>
+                    <td><span class="code-pill">#{{ j.job_id }}</span></td>
+                    <td style="font-weight: 600;">
+                        <a href="{{ url_for('equipment_detail', equipment_id=j.equipment_id) }}" style="color: var(--text-primary); text-decoration: none;">
+                            {{ j.equipment_name }}
+                        </a>
+                    </td>
+                    <td style="font-size: 12px; color: var(--text-secondary); max-width: 200px;">{{ j.problem_description }}</td>
+                    <td style="font-size: 12px; color: var(--accent-cyan); max-width: 200px;">{{ j.action_taken or 'In diagnostic stage...' }}</td>
+                    <td>{{ j.vendor_name or 'In-House Service' }}</td>
+                    <td style="font-family: var(--font-mono); font-size: 12px;">{{ j.start_date }}</td>
+                    <td style="font-family: var(--font-mono); font-size: 12px;">{{ j.completion_date or '&mdash;' }}</td>
+                    <td style="font-family: var(--font-mono); font-weight: 600;">₹{{ "%.2f"|format(j.cost) }}</td>
+                    <td>
+                        <span class="badge badge-{{ j.status.lower().replace(' ', '-') }}">{{ j.status }}</span>
+                    </td>
+                    <td style="text-align: right;">
+                        {% if j.status in ['Scheduled', 'In Progress'] %}
+                            <button class="btn btn-success btn-sm" onclick="openCompleteMaintModal('{{ j.job_id }}', '{{ j.equipment_name }}', '{{ j.cost }}')">
+                                <i class="fa-solid fa-check"></i> Complete
+                            </button>
+                        {% else %}
+                            <span style="font-size: 12px; color: var(--accent-emerald);"><i class="fa-solid fa-circle-check"></i> Closed</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        No maintenance jobs recorded.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Reported Breakdowns -->
+<div class="card-section">
+    <div class="section-header">
+        <div class="section-title">
+            <i class="fa-solid fa-triangle-exclamation" style="color: var(--accent-rose);"></i>
+            <span>Reported Equipment Breakdowns</span>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table class="table-modern">
+            <thead>
+                <tr>
+                    <th>Breakdown ID</th>
+                    <th>Equipment</th>
+                    <th>Reported By</th>
+                    <th>Incident Date</th>
+                    <th>Problem Description</th>
+                    <th>Severity</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in breakdowns %}
+                <tr>
+                    <td><span class="code-pill">#{{ b.breakdown_id }}</span></td>
+                    <td style="font-weight: 600;">{{ b.equipment_name }}</td>
+                    <td>{{ b.reporter_name }}</td>
+                    <td style="font-family: var(--font-mono); font-size: 12px;">{{ b.reported_date }}</td>
+                    <td style="font-size: 12px; color: var(--text-secondary);">{{ b.problem_description }}</td>
+                    <td>
+                        <span class="badge badge-{{ b.severity.lower() }}">{{ b.severity }}</span>
+                    </td>
+                    <td>
+                        <span class="badge badge-{{ b.status.lower().replace(' ', '-') }}">{{ b.status }}</span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        No breakdowns reported.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Report Breakdown -->
+<div id="reportBreakdownModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Report Equipment Breakdown</h3>
+            <button class="modal-close" onclick="closeModal('reportBreakdownModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('breakdown_report') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Faulty Equipment *</label>
+                    <select name="equipment_id" required class="form-select">
+                        {% for eq in equipment %}
+                        <option value="{{ eq.equipment_id }}">{{ eq.equipment_name }} ({{ eq.equipment_id }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Reported By *</label>
+                        <select name="reported_by" required class="form-select">
+                            {% for u in users %}
+                            <option value="{{ u.user_id }}">{{ u.full_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Incident Date *</label>
+                        <input type="date" name="reported_date" required class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Severity Level *</label>
+                    <select name="severity" required class="form-select">
+                        <option value="Low">Low - Cosmetic / Minor Flaw</option>
+                        <option value="Medium" selected>Medium - Degraded Performance</option>
+                        <option value="High">High - Unit Inoperable</option>
+                        <option value="Critical">Critical - Safety Hazard / Total Failure</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Detailed Symptoms / Failure Description *</label>
+                    <textarea name="problem_description" required rows="3" placeholder="Describe error codes, smoke, jitter, burnt traces..." class="form-control"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('reportBreakdownModal')">Cancel</button>
+                <button type="submit" class="btn btn-danger">File Breakdown Report</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Launch Maintenance Job -->
+<div id="createMaintenanceModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Launch Maintenance Job</h3>
+            <button class="modal-close" onclick="closeModal('createMaintenanceModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('maintenance_create') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Equipment to Service *</label>
+                    <select name="equipment_id" required class="form-select">
+                        {% for eq in equipment %}
+                        <option value="{{ eq.equipment_id }}">{{ eq.equipment_name }} ({{ eq.equipment_id }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Link Breakdown Incident</label>
+                        <select name="breakdown_id" class="form-select">
+                            <option value="">-- None (Routine Maintenance) --</option>
+                            {% for b in breakdowns %}
+                            <option value="{{ b.breakdown_id }}">#{{ b.breakdown_id }} - {{ b.equipment_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Assigned Vendor / Service Partner</label>
+                        <select name="vendor_id" class="form-select">
+                            <option value="">-- In-House Lab Technician --</option>
+                            {% for v in vendors %}
+                            <option value="{{ v.vendor_id }}">{{ v.vendor_name }} ({{ v.service_type }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Start Date *</label>
+                        <input type="date" name="start_date" required class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Estimated Cost (₹)</label>
+                        <input type="number" step="0.01" name="cost" value="0.00" class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Problem / Scope of Work *</label>
+                    <textarea name="problem_description" required rows="3" placeholder="Scope of repair, parts to replace..." class="form-control"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('createMaintenanceModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Start Job</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Complete Maintenance -->
+<div id="completeMaintModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Close Maintenance Job</h3>
+            <button class="modal-close" onclick="closeModal('completeMaintModal')">&times;</button>
+        </div>
+        <form id="completeMaintForm" method="POST" action="">
+            <div class="modal-body">
+                <div id="completeMaintHeader" style="font-weight: 600; margin-bottom: 16px; color: var(--accent-cyan);">Job Details</div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Completion Date *</label>
+                        <input type="date" name="completion_date" required class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Final Billed Cost (₹) *</label>
+                        <input type="number" step="0.01" id="maintCostInput" name="cost" required value="0.00" class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Action Taken &amp; Resolution Notes *</label>
+                    <textarea name="action_taken" required rows="3" placeholder="Replaced faulty driver board, flashed updated firmware..." class="form-control"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('completeMaintModal')">Cancel</button>
+                <button type="submit" class="btn btn-success">Mark Completed &amp; Make Available</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openCompleteMaintModal(jobId, eqName, cost) {
+    const form = document.getElementById('completeMaintForm');
+    form.action = `/maintenance/${jobId}/complete`;
+    document.getElementById('completeMaintHeader').innerText = `Closing Maintenance Job #${jobId} for: ${eqName}`;
+    document.getElementById('maintCostInput').value = cost;
+    openModal('completeMaintModal');
+}
+</script>
+{% endblock %}

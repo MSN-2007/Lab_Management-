@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RoboLab{% endblock %} - Robotics Lab Management</title>
+    <!-- Offline FontAwesome Icons (Local) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fontawesome.min.css') }}">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand-section">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <div>
+                    <div class="brand-title">RoboLab</div>
+                    <div class="brand-badge">{{ current_user.role_name if current_user else 'PORTAL' }}</div>
+                </div>
+            </div>
+
+            <ul class="nav-menu">
+                <li class="nav-section-title">Main</li>
+                <li class="nav-item">
+                    <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <span>{% if current_user and current_user.role_name == 'Student' %}My Student Portal{% else %}Dashboard{% endif %}</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('equipment_list') }}" class="nav-link {% if request.endpoint in ['equipment_list', 'equipment_detail'] %}active{% endif %}">
+                        <i class="fa-solid fa-microchip"></i>
+                        <span>Equipment Catalog</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('components_list') }}" class="nav-link {% if request.endpoint == 'components_list' %}active{% endif %}">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                        <span>Component Stock</span>
+                        {% if low_stock_alerts_count > 0 and (not current_user or current_user.role_name in ['Admin', 'Lab Technician']) %}
+                            <span class="badge badge-overdue" style="margin-left: auto; padding: 1px 6px; font-size: 10px;">{{ low_stock_alerts_count }}</span>
+                        {% endif %}
+                    </a>
+                </li>
+
+                <li class="nav-section-title">Operations</li>
+                <li class="nav-item">
+                    <a href="{{ url_for('bookings_list') }}" class="nav-link {% if request.endpoint == 'bookings_list' %}active{% endif %}">
+                        <i class="fa-solid fa-calendar-check"></i>
+                        <span>{% if current_user and current_user.role_name == 'Student' %}My Slot Bookings{% else %}Equipment Bookings{% endif %}</span>
+                        {% if pending_bookings_count > 0 and (not current_user or current_user.role_name in ['Admin', 'Faculty']) %}
+                            <span class="badge badge-pending" style="margin-left: auto; padding: 1px 6px; font-size: 10px;">{{ pending_bookings_count }}</span>
+                        {% endif %}
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('allocations_list') }}" class="nav-link {% if request.endpoint == 'allocations_list' %}active{% endif %}">
+                        <i class="fa-solid fa-hand-holding-hand"></i>
+                        <span>{% if current_user and current_user.role_name == 'Student' %}My Issued Components{% else %}Project Allocations{% endif %}</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('projects_list') }}" class="nav-link {% if request.endpoint == 'projects_list' %}active{% endif %}">
+                        <i class="fa-solid fa-diagram-project"></i>
+                        <span>Robotics Projects</span>
+                    </a>
+                </li>
+
+                {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician', 'Faculty'] %}
+                <li class="nav-section-title">Administration</li>
+                {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
+                <li class="nav-item">
+                    <a href="{{ url_for('maintenance_list') }}" class="nav-link {% if request.endpoint == 'maintenance_list' %}active{% endif %}">
+                        <i class="fa-solid fa-screwdriver-wrench"></i>
+                        <span>Maintenance</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('calibrations_list') }}" class="nav-link {% if request.endpoint == 'calibrations_list' %}active{% endif %}">
+                        <i class="fa-solid fa-compass-drafting"></i>
+                        <span>Calibrations</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('vendors_list') }}" class="nav-link {% if request.endpoint == 'vendors_list' %}active{% endif %}">
+                        <i class="fa-solid fa-truck-ramp-box"></i>
+                        <span>Vendors</span>
+                    </a>
+                </li>
+                {% endif %}
+
+                {% if not current_user or current_user.role_name in ['Admin', 'Faculty'] %}
+                <li class="nav-item">
+                    <a href="{{ url_for('reports_view') }}" class="nav-link {% if request.endpoint == 'reports_view' %}active{% endif %}">
+                        <i class="fa-solid fa-database"></i>
+                        <span>SQL Reports</span>
+                    </a>
+                </li>
+                {% endif %}
+                {% endif %}
+            </ul>
+
+            <div class="sidebar-footer">
+                <div class="engine-tag" style="margin-bottom: 8px;">
+                    <div class="status-dot"></div>
+                    <span>{{ database_engine }}</span>
+                </div>
+                <a href="{{ url_for('logout') }}" style="display: flex; align-items: center; gap: 6px; color: var(--accent-rose); text-decoration: none; font-size: 12px; font-weight: 500;">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    <span>Log Out</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Body Wrapper -->
+        <div class="main-wrapper">
+            <header class="topbar">
+                <div class="page-title-group">
+                    <h1>{% block page_title %}Robotics Laboratory Management System{% endblock %}</h1>
+                </div>
+                <div class="topbar-actions">
+                    <!-- Quick Role Switcher Dropdown -->
+                    <div class="persona-switcher">
+                        <span>Persona:</span>
+                        <select onchange="window.location.href='/switch-role/' + this.value">
+                            {% for u in demo_users %}
+                            <option value="{{ u.user_id }}" {% if current_user and current_user.user_id == u.user_id %}selected{% endif %}>
+                                {{ u.role_name }}: {{ u.full_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    {% if not current_user or current_user.role_name in ['Admin', 'Faculty'] %}
+                    <a href="{{ url_for('reports_view') }}" class="btn btn-secondary btn-sm">
+                        <i class="fa-solid fa-terminal"></i>
+                        <span>SQL Reports</span>
+                    </a>
+                    {% endif %}
+
+                    <!-- Active User Badge -->
+                    <div class="user-profile">
+                        <div class="user-avatar">
+                            {{ current_user.full_name[:2].upper() if current_user else 'US' }}
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; font-size: 13px;">{{ current_user.full_name if current_user else 'Guest' }}</div>
+                            <div style="font-size: 11px; color: var(--accent-primary); font-family: var(--font-mono);">
+                                {{ current_user.role_name if current_user else 'Visitor' }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <main class="content-body">
+                <!-- Flash alerts -->
+                <div class="flash-container">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }}">
+                                    <span>{{ message }}</span>
+                                    <button onclick="this.parentElement.remove()" style="background:none; border:none; color:inherit; cursor:pointer; font-size:16px;">&times;</button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                </div>
+
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

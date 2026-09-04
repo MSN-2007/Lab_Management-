@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+
+{% block title %}Calibrations - RoboLab{% endblock %}
+{% block page_title %}Equipment Metrology &amp; Calibration Schedule{% endblock %}
+
+{% block content %}
+<div class="card-section">
+    <div class="section-header">
+        <div class="section-title">
+            <i class="fa-solid fa-compass-drafting" style="color: var(--accent-cyan);"></i>
+            <span>Precision Equipment Calibration Log</span>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table class="table-modern">
+            <thead>
+                <tr>
+                    <th>Calib ID</th>
+                    <th>Equipment</th>
+                    <th>Location</th>
+                    <th>Last Calibration Date</th>
+                    <th>Next Due Date</th>
+                    <th>Certifying Body / Technician</th>
+                    <th>Status</th>
+                    <th>Notes &amp; Tolerances</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in calibrations %}
+                <tr>
+                    <td><span class="code-pill">#{{ c.calibration_id }}</span></td>
+                    <td style="font-weight: 600;">
+                        <a href="{{ url_for('equipment_detail', equipment_id=c.equipment_id) }}" style="color: var(--text-primary); text-decoration: none;">
+                            {{ c.equipment_name }}
+                        </a>
+                        <span class="code-pill" style="font-size: 11px;">{{ c.equipment_id }}</span>
+                    </td>
+                    <td>{{ c.location }}</td>
+                    <td style="font-family: var(--font-mono); font-size: 12px;">{{ c.last_calibration_date }}</td>
+                    <td style="font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: {% if c.status == 'Overdue' %}var(--accent-rose){% elif c.status == 'Due Soon' %}var(--accent-amber){% else %}var(--accent-emerald){% endif %};">
+                        {{ c.next_due_date }}
+                    </td>
+                    <td>{{ c.certified_by }}</td>
+                    <td>
+                        <span class="badge badge-{{ c.status.lower().replace(' ', '-') }}">{{ c.status }}</span>
+                    </td>
+                    <td style="font-size: 12px; color: var(--text-secondary);">{{ c.remarks }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        No calibration records found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

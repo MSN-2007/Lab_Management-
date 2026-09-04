@@ -1,0 +1,119 @@
+{% extends "layout.html" %}
+
+{% block title %}Student Projects - RoboLab{% endblock %}
+{% block page_title %}Academic Robotics Projects &amp; Teams{% endblock %}
+
+{% block content %}
+<div class="card-section">
+    <div class="section-header">
+        <div class="section-title">
+            <i class="fa-solid fa-diagram-project" style="color: var(--accent-cyan);"></i>
+            <span>Active Student Robotics Projects</span>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('createProjectModal')">
+            <i class="fa-solid fa-plus"></i>
+            <span>Register New Project</span>
+        </button>
+    </div>
+
+    <!-- Projects Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 20px;">
+        {% for p in projects %}
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; justify-content: space-between; transition: var(--transition);" onmouseover="this.style.borderColor='var(--border-active)'" onmouseout="this.style.borderColor='var(--border-subtle)'">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                    <span class="code-pill">Project #{{ p.project_id }}</span>
+                    <span class="badge badge-{{ p.status.lower() }}">{{ p.status }}</span>
+                </div>
+
+                <h3 style="font-family: var(--font-heading); font-size: 17px; font-weight: 700; margin-bottom: 8px;">
+                    {{ p.project_name }}
+                </h3>
+                
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; min-height: 36px;">
+                    {{ p.description }}
+                </p>
+
+                <div style="font-size: 12px; margin-bottom: 12px;">
+                    <span style="color: var(--text-muted);">Guide Faculty:</span>
+                    <strong style="color: var(--text-primary); margin-left: 4px;">{{ p.guide_name or 'Not Assigned' }}</strong>
+                </div>
+
+                <div style="font-size: 12px; font-family: var(--font-mono); color: var(--text-muted); margin-bottom: 16px;">
+                    Timeline: {{ p.start_date }} &rarr; {{ p.end_date or 'Ongoing' }}
+                </div>
+
+                <!-- Team Members List -->
+                <div style="border-top: 1px solid var(--border-subtle); padding-top: 12px; margin-top: 12px;">
+                    <div style="font-size: 11px; text-transform: uppercase; font-weight: 600; color: var(--text-muted); margin-bottom: 8px;">
+                        Team Members ({{ members_map[p.project_id]|length }})
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        {% for m in members_map[p.project_id] %}
+                        <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                            <span>{{ m.full_name }} <span style="font-family: var(--font-mono); color: var(--text-muted); font-size: 11px;">({{ m.roll_number }})</span></span>
+                            <span style="color: var(--accent-cyan); font-size: 11px;">{{ m.role_in_project }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 12px;">
+                <span style="font-size: 12px; color: var(--accent-indigo); font-family: var(--font-mono);">
+                    {{ p.items_allocated }} Active Components
+                </span>
+                <a href="{{ url_for('allocations_list') }}" class="btn btn-secondary btn-sm">View Allocations</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Modal: Create Project -->
+<div id="createProjectModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Register Robotics Academic Project</h3>
+            <button class="modal-close" onclick="closeModal('createProjectModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('project_create') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Project Title *</label>
+                    <input type="text" name="project_name" required placeholder="e.g. Swarm Robotics Search and Rescue System" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Faculty Mentor / Guide *</label>
+                    <select name="guide_faculty_id" required class="form-select">
+                        {% for f in faculty %}
+                        <option value="{{ f.user_id }}">{{ f.full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Start Date *</label>
+                        <input type="date" name="start_date" required class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Target Completion Date</label>
+                        <input type="date" name="end_date" class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Project Scope &amp; Abstract</label>
+                    <textarea name="description" rows="3" placeholder="Brief abstract of the robotics subsystem..." class="form-control"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('createProjectModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Register Project</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

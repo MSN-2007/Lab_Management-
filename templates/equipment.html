@@ -1,0 +1,166 @@
+{% extends "layout.html" %}
+
+{% block title %}Equipment Catalog - RoboLab{% endblock %}
+{% block page_title %}Robotics Equipment Inventory{% endblock %}
+
+{% block content %}
+<div class="card-section">
+    <div class="section-header">
+        <div class="section-title">
+            <i class="fa-solid fa-microchip" style="color: var(--accent-cyan);"></i>
+            <span>Registered Laboratory Equipment</span>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('addEquipmentModal')">
+            <i class="fa-solid fa-plus"></i>
+            <span>Register Equipment</span>
+        </button>
+    </div>
+
+    <!-- Search & Filter Bar -->
+    <form method="GET" action="{{ url_for('equipment_list') }}" style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
+        <input type="text" name="q" value="{{ search }}" placeholder="Search by name, ID or location..." class="form-control" style="flex: 2; min-width: 200px;">
+        
+        <select name="status" class="form-select" style="flex: 1; min-width: 150px;">
+            <option value="">All Statuses</option>
+            <option value="Available" {% if selected_status == 'Available' %}selected{% endif %}>Available</option>
+            <option value="In Use" {% if selected_status == 'In Use' %}selected{% endif %}>In Use</option>
+            <option value="Maintenance" {% if selected_status == 'Maintenance' %}selected{% endif %}>Maintenance</option>
+            <option value="Decommissioned" {% if selected_status == 'Decommissioned' %}selected{% endif %}>Decommissioned</option>
+        </select>
+
+        <select name="category" class="form-select" style="flex: 1; min-width: 180px;">
+            <option value="">All Categories</option>
+            {% for c in categories %}
+            <option value="{{ c.category_id }}" {% if selected_cat == c.category_id|string %}selected{% endif %}>{{ c.category_name }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit" class="btn btn-secondary">Filter</button>
+        {% if search or selected_status or selected_cat %}
+        <a href="{{ url_for('equipment_list') }}" class="btn btn-secondary" style="color: var(--text-muted);">Reset</a>
+        {% endif %}
+    </form>
+
+    <!-- Equipment Table -->
+    <div class="table-container">
+        <table class="table-modern">
+            <thead>
+                <tr>
+                    <th>Equipment ID</th>
+                    <th>Equipment Name</th>
+                    <th>Category</th>
+                    <th>Laboratory</th>
+                    <th>Location / Bay</th>
+                    <th>Purchase Date</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for eq in equipment %}
+                <tr>
+                    <td><span class="code-pill">{{ eq.equipment_id }}</span></td>
+                    <td style="font-weight: 600;">
+                        <a href="{{ url_for('equipment_detail', equipment_id=eq.equipment_id) }}" style="color: var(--text-primary); text-decoration: none; border-bottom: 1px dashed var(--accent-cyan);">
+                            {{ eq.equipment_name }}
+                        </a>
+                    </td>
+                    <td>{{ eq.category_name }}</td>
+                    <td style="color: var(--text-secondary);">{{ eq.lab_name }}</td>
+                    <td>{{ eq.location }}</td>
+                    <td style="font-family: var(--font-mono); font-size: 12px;">{{ eq.purchase_date }}</td>
+                    <td>
+                        <span class="badge badge-{{ eq.status.lower().replace(' ', '-') }}">{{ eq.status }}</span>
+                    </td>
+                    <td style="text-align: right;">
+                        <a href="{{ url_for('equipment_detail', equipment_id=eq.equipment_id) }}" class="btn btn-secondary btn-sm">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            <span>History &amp; Timeline</span>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        No equipment matched the selected criteria.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Register New Equipment -->
+<div id="addEquipmentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Register New Robotics Equipment</h3>
+            <button class="modal-close" onclick="closeModal('addEquipmentModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('equipment_add') }}">
+            <div class="modal-body">
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Equipment ID *</label>
+                        <input type="text" name="equipment_id" required placeholder="e.g. EQ008" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Serial Number</label>
+                        <input type="text" name="serial_number" placeholder="e.g. SN-9821-X" class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Equipment Name *</label>
+                    <input type="text" name="equipment_name" required placeholder="e.g. Universal Robots UR5e Robotic Arm" class="form-control">
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Category *</label>
+                        <select name="category_id" required class="form-select">
+                            {% for c in categories %}
+                            <option value="{{ c.category_id }}">{{ c.category_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Assigned Laboratory *</label>
+                        <select name="laboratory_id" required class="form-select">
+                            {% for l in labs %}
+                            <option value="{{ l.lab_id }}">{{ l.lab_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Purchase Date *</label>
+                        <input type="date" name="purchase_date" required class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Warranty End Date</label>
+                        <input type="date" name="warranty_end" class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Location / Workstation *</label>
+                    <input type="text" name="location" required placeholder="e.g. Workstation 5, Lab 301" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Description & Technical Specifications</label>
+                    <textarea name="description" rows="3" placeholder="Payload, DOF, motor specs, communication protocols..." class="form-control"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addEquipmentModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Equipment</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

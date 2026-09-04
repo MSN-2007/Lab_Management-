@@ -1,0 +1,404 @@
+{% extends "layout.html" %}
+
+{% block title %}Dashboard - RoboLab{% endblock %}
+{% block page_title %}
+    {% if role == 'Student' %}
+        Student Portal &mdash; Welcome, {{ current_user.full_name }}
+    {% else %}
+        Laboratory Dashboard ({{ role }} View)
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% if role == 'Student' %}
+<!-- ==============================================================================
+     STUDENT PERSONAL PORTAL VIEW
+     ============================================================================== -->
+<div class="metrics-grid">
+    <div class="metric-card" style="--card-accent: var(--accent-cyan);">
+        <div class="metric-header">
+            <span class="metric-title">Issued Components</span>
+            <div class="metric-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
+        </div>
+        <div class="metric-value">{{ my_allocations|length }}</div>
+        <div class="metric-subtitle">Active borrowed items</div>
+    </div>
+
+    <div class="metric-card" style="--card-accent: var(--accent-indigo);">
+        <div class="metric-header">
+            <span class="metric-title">Slot Bookings</span>
+            <div class="metric-icon"><i class="fa-solid fa-calendar-check"></i></div>
+        </div>
+        <div class="metric-value">{{ my_bookings|length }}</div>
+        <div class="metric-subtitle">Reserved slot sessions</div>
+    </div>
+
+    <div class="metric-card" style="--card-accent: var(--accent-emerald);">
+        <div class="metric-header">
+            <span class="metric-title">Active Projects</span>
+            <div class="metric-icon"><i class="fa-solid fa-diagram-project"></i></div>
+        </div>
+        <div class="metric-value">{{ my_projects|length }}</div>
+        <div class="metric-subtitle">Registered teams</div>
+    </div>
+
+    <div class="metric-card" style="--card-accent: var(--accent-purple);">
+        <div class="metric-header">
+            <span class="metric-title">Available Equipment</span>
+            <div class="metric-icon"><i class="fa-solid fa-microchip"></i></div>
+        </div>
+        <div class="metric-value">{{ avail_eq }}</div>
+        <div class="metric-subtitle">Ready for booking</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+    <div>
+        <!-- My Issued Components Table -->
+        <div class="card-section">
+            <div class="section-header">
+                <div class="section-title">
+                    <i class="fa-solid fa-hand-holding-hand" style="color: var(--accent-cyan);"></i>
+                    <span>My Currently Issued Components</span>
+                </div>
+                <a href="{{ url_for('allocations_list') }}" class="btn btn-secondary btn-sm">View All</a>
+            </div>
+
+            <div class="table-container">
+                <table class="table-modern">
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>Quantity</th>
+                            <th>Project</th>
+                            <th>Issue Date</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in my_allocations %}
+                        <tr>
+                            <td style="font-weight: 600;">
+                                {{ a.component_name }}
+                                <span class="code-pill" style="font-size: 11px;">{{ a.component_id }}</span>
+                            </td>
+                            <td style="font-weight: 600;">{{ a.quantity }}</td>
+                            <td style="color: var(--text-secondary);">{{ a.project_name }}</td>
+                            <td style="font-family: var(--font-mono); font-size: 12px;">{{ a.issue_date }}</td>
+                            <td style="font-family: var(--font-mono); font-size: 12px; color: var(--accent-amber);">{{ a.expected_return_date }}</td>
+                            <td>
+                                <span class="badge badge-{{ a.status.lower() }}">{{ a.status }}</span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                                You currently have no issued components.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- My Equipment Bookings Table -->
+        <div class="card-section">
+            <div class="section-header">
+                <div class="section-title">
+                    <i class="fa-solid fa-calendar-check" style="color: var(--accent-indigo);"></i>
+                    <span>My Equipment Slot Reservations</span>
+                </div>
+                <a href="{{ url_for('bookings_list') }}" class="btn btn-primary btn-sm">Book Slot</a>
+            </div>
+
+            <div class="table-container">
+                <table class="table-modern">
+                    <thead>
+                        <tr>
+                            <th>Equipment</th>
+                            <th>Location</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Purpose</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for b in my_bookings %}
+                        <tr>
+                            <td style="font-weight: 600;">{{ b.equipment_name }}</td>
+                            <td style="color: var(--text-secondary);">{{ b.location }}</td>
+                            <td style="font-family: var(--font-mono); font-size: 12px;">{{ b.booking_date }}</td>
+                            <td style="font-family: var(--font-mono); font-size: 12px; color: var(--accent-blue);">{{ b.start_time }} - {{ b.end_time }}</td>
+                            <td style="font-size: 12px; color: var(--text-secondary); max-width: 180px;">{{ b.purpose }}</td>
+                            <td>
+                                <span class="badge badge-{{ b.status.lower().replace('_', '-') }}">{{ b.status }}</span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                                No active booking slots requested.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <!-- My Projects Summary -->
+        <div class="card-section">
+            <div class="section-header">
+                <div class="section-title">
+                    <i class="fa-solid fa-diagram-project" style="color: var(--accent-emerald);"></i>
+                    <span>My Projects</span>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                {% for p in my_projects %}
+                <div style="background: var(--bg-card-secondary); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+                        <span style="font-weight: 600; font-size: 13px;">{{ p.project_name }}</span>
+                        <span class="badge badge-{{ p.status.lower() }}">{{ p.status }}</span>
+                    </div>
+                    <div style="font-size: 12px; color: var(--accent-blue); margin-bottom: 2px;">Role: {{ p.role_in_project }}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Guide: {{ p.guide_name or 'Faculty Mentor' }}</div>
+                </div>
+                {% else %}
+                <div style="color: var(--text-muted); font-size: 13px;">No projects registered.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Quick Action Card -->
+        <div class="card-section">
+            <div class="section-title" style="margin-bottom: 8px;">
+                <i class="fa-solid fa-compass" style="color: var(--accent-primary);"></i>
+                <span>Quick Actions</span>
+            </div>
+            <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 14px;">
+                Browse lab equipment catalog or check available sensor &amp; controller stock.
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <a href="{{ url_for('equipment_list') }}" class="btn btn-secondary btn-sm" style="justify-content: center;">
+                    <i class="fa-solid fa-search"></i> Browse Equipment Catalog
+                </a>
+                <a href="{{ url_for('components_list') }}" class="btn btn-secondary btn-sm" style="justify-content: center;">
+                    <i class="fa-solid fa-microchip"></i> Check Component Stock
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- ==============================================================================
+     STAFF / ADMIN / TECHNICIAN / FACULTY VIEW
+     ============================================================================== -->
+<!-- KPI Overview Cards -->
+<div class="metrics-grid">
+    <div class="metric-card" style="--card-accent: var(--accent-blue);">
+        <div class="metric-header">
+            <span class="metric-title">Total Equipment</span>
+            <div class="metric-icon"><i class="fa-solid fa-microchip"></i></div>
+        </div>
+        <div class="metric-value">{{ total_eq }}</div>
+        <div class="metric-subtitle">{{ avail_eq }} Available for Booking</div>
+    </div>
+
+    <div class="metric-card" style="--card-accent: var(--accent-emerald);">
+        <div class="metric-header">
+            <span class="metric-title">Available Now</span>
+            <div class="metric-icon"><i class="fa-solid fa-circle-check"></i></div>
+        </div>
+        <div class="metric-value">{{ avail_eq }}</div>
+        <div class="metric-subtitle">{{ in_use_eq }} Currently In Use</div>
+    </div>
+
+    <div class="metric-card" style="--card-accent: var(--accent-amber);">
+        <div class="metric-header">
+            <span class="metric-title">In Maintenance</span>
+            <div class="metric-icon"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+        </div>
+        <div class="metric-value">{{ maint_eq }}</div>
+        <div class="metric-subtitle">Under repair / servicing</div>
+    </div>
+
+    <div class="metric-card" style="--card-accent: var(--accent-indigo);">
+        <div class="metric-header">
+            <span class="metric-title">Available Component Units</span>
+            <div class="metric-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
+        </div>
+        <div class="metric-value">{{ avail_comp_units }}</div>
+        <div class="metric-subtitle">{{ total_comp }} Unique Types</div>
+    </div>
+
+    <div class="metric-card" style="--card-accent: var(--accent-purple);">
+        <div class="metric-header">
+            <span class="metric-title">Active Projects</span>
+            <div class="metric-icon"><i class="fa-solid fa-diagram-project"></i></div>
+        </div>
+        <div class="metric-value">{{ active_projects }}</div>
+        <div class="metric-subtitle">{{ active_allocations }} Active Issues</div>
+    </div>
+</div>
+
+<!-- Two-Column Activity Feed -->
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+    <!-- Left Column: Active Allocations & Bookings -->
+    <div>
+        <!-- Recent Component Allocations -->
+        <div class="card-section">
+            <div class="section-header">
+                <div class="section-title">
+                    <i class="fa-solid fa-hand-holding-hand" style="color: var(--accent-blue);"></i>
+                    <span>Recent Component Allocations</span>
+                </div>
+                <a href="{{ url_for('allocations_list') }}" class="btn btn-secondary btn-sm">View All</a>
+            </div>
+
+            <div class="table-container">
+                <table class="table-modern">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Component</th>
+                            <th>Qty</th>
+                            <th>Project</th>
+                            <th>Issue Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in recent_allocations %}
+                        <tr>
+                            <td style="font-weight: 600;">{{ a.student_name }}</td>
+                            <td><span class="code-pill">{{ a.component_name }}</span></td>
+                            <td style="font-weight: 600;">{{ a.quantity }}</td>
+                            <td style="color: var(--text-secondary);">{{ a.project_name }}</td>
+                            <td style="font-family: var(--font-mono); font-size: 12px;">{{ a.issue_date }}</td>
+                            <td>
+                                <span class="badge badge-{{ a.status.lower() }}">{{ a.status }}</span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 16px;">No recent allocations found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Recent Equipment Bookings -->
+        <div class="card-section">
+            <div class="section-header">
+                <div class="section-title">
+                    <i class="fa-solid fa-calendar-check" style="color: var(--accent-indigo);"></i>
+                    <span>Recent Equipment Bookings</span>
+                </div>
+                <a href="{{ url_for('bookings_list') }}" class="btn btn-secondary btn-sm">Manage</a>
+            </div>
+
+            <div class="table-container">
+                <table class="table-modern">
+                    <thead>
+                        <tr>
+                            <th>Equipment</th>
+                            <th>Booked By</th>
+                            <th>Date</th>
+                            <th>Time Slot</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for b in recent_bookings %}
+                        <tr>
+                            <td style="font-weight: 600;">{{ b.equipment_name }}</td>
+                            <td>{{ b.student_name }}</td>
+                            <td style="font-family: var(--font-mono); font-size: 12px;">{{ b.booking_date }}</td>
+                            <td style="font-family: var(--font-mono); font-size: 12px; color: var(--accent-blue);">{{ b.start_time }} - {{ b.end_time }}</td>
+                            <td>
+                                <span class="badge badge-{{ b.status.lower().replace('_', '-') }}">{{ b.status }}</span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">No recent bookings found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Low Stock Alerts & Maintenance Tracking -->
+    <div>
+        <!-- Low Stock Warning Widget -->
+        <div class="card-section">
+            <div class="section-header">
+                <div class="section-title">
+                    <i class="fa-solid fa-triangle-exclamation" style="color: var(--accent-rose);"></i>
+                    <span>Low Stock Alerts</span>
+                </div>
+                <a href="{{ url_for('components_list') }}?low_stock=1" class="btn btn-secondary btn-sm">Restock</a>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                {% for item in low_stock_items %}
+                <div style="background: var(--bg-card-secondary); padding: 10px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <div style="font-weight: 600; font-size: 13px;">{{ item.component_name }}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Threshold: {{ item.minimum_stock }} units</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span class="badge badge-overdue">{{ item.available_quantity }} left</span>
+                    </div>
+                </div>
+                {% else %}
+                <div style="color: var(--text-muted); font-size: 13px;">All components are sufficiently stocked.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Recent Maintenance & Service Jobs -->
+        <div class="card-section">
+            <div class="section-header">
+                <div class="section-title">
+                    <i class="fa-solid fa-wrench" style="color: var(--accent-amber);"></i>
+                    <span>Maintenance Activity</span>
+                </div>
+                <a href="{{ url_for('maintenance_list') }}" class="btn btn-secondary btn-sm">All Jobs</a>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                {% for m in recent_maintenance %}
+                <div style="background: var(--bg-card-secondary); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span style="font-weight: 600; font-size: 13px;">{{ m.equipment_name }}</span>
+                        <span class="badge badge-{{ m.status.lower().replace(' ', '-') }}">{{ m.status }}</span>
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">{{ m.problem_description }}</div>
+                    <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+                        Started: {{ m.start_date }} {% if m.vendor_name %}| {{ m.vendor_name }}{% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div style="color: var(--text-muted); font-size: 13px;">No recent maintenance activity.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

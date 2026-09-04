@@ -1,0 +1,86 @@
+{% extends "layout.html" %}
+
+{% block title %}DBMS SQL Reports - RoboLab{% endblock %}
+{% block page_title %}DBMS Viva &amp; SQL Query Reports Explorer{% endblock %}
+
+{% block content %}
+<!-- Catalog of Academic Review Queries -->
+<div class="card-section">
+    <div class="section-header">
+        <div class="section-title">
+            <i class="fa-solid fa-terminal" style="color: var(--accent-cyan);"></i>
+            <span>Select DBMS Review Query to Execute</span>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        {% for key, r in reports_catalog.items() %}
+        <a href="{{ url_for('reports_view', report=key) }}" class="btn {% if selected_key == key %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+            <i class="fa-solid fa-code"></i>
+            <span>{{ r.title }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Active Query Details & SQL Code View -->
+<div class="card-section">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+        <div>
+            <h2 style="font-family: var(--font-heading); font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
+                {{ report_info.title }}
+            </h2>
+            <p style="color: var(--text-secondary); font-size: 13px;">
+                {{ report_info.desc }}
+            </p>
+        </div>
+        <span class="badge badge-available" style="padding: 6px 14px; font-size: 12px;">
+            {{ results|length }} Rows Returned
+        </span>
+    </div>
+
+    <!-- SQL Code Display Box for Viva Reviews -->
+    <div class="sql-box">
+        <span class="sql-badge">Executed SQL Statement</span>
+        <pre><code>{{ report_info.sql.strip() }}</code></pre>
+    </div>
+
+    <!-- Result Data Table -->
+    <div class="table-container">
+        <table class="table-modern">
+            <thead>
+                <tr>
+                    {% for col in columns %}
+                    <th>{{ col.replace('_', ' ').title() }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in results %}
+                <tr>
+                    {% for col in columns %}
+                    <td>
+                        {% if 'status' in col.lower() %}
+                            <span class="badge badge-{{ (row[col]|string).lower().replace(' ', '-').replace('_', '-') }}">{{ row[col] }}</span>
+                        {% elif 'id' in col.lower() %}
+                            <span class="code-pill">{{ row[col] }}</span>
+                        {% elif 'cost' in col.lower() or 'value' in col.lower() %}
+                            <span style="font-family: var(--font-mono); font-weight: 600;">₹{{ "%.2f"|format(row[col]|float) if row[col] is not none else '0.00' }}</span>
+                        {% else %}
+                            {{ row[col] if row[col] is not none else '&mdash;' }}
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="{{ columns|length or 1 }}" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        No records returned for this query.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

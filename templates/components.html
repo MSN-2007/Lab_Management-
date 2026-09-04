@@ -1,0 +1,201 @@
+{% extends "layout.html" %}
+
+{% block title %}Component Stock - RoboLab{% endblock %}
+{% block page_title %}Robotics Electronics &amp; Component Inventory{% endblock %}
+
+{% block content %}
+<div class="card-section">
+    <div class="section-header">
+        <div class="section-title">
+            <i class="fa-solid fa-boxes-stacked" style="color: var(--accent-cyan);"></i>
+            <span>Component Stock &amp; Real-time Quantities</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="openModal('restockModal')">
+                <i class="fa-solid fa-cart-plus"></i>
+                <span>Restock Units</span>
+            </button>
+            <button class="btn btn-primary" onclick="openModal('addComponentModal')">
+                <i class="fa-solid fa-plus"></i>
+                <span>Add New Component</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Search & Filter Controls -->
+    <form method="GET" action="{{ url_for('components_list') }}" style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
+        <input type="text" name="q" value="{{ search }}" placeholder="Search by component name, ID or bin..." class="form-control" style="flex: 2; min-width: 200px;">
+        
+        <select name="category" class="form-select" style="flex: 1; min-width: 180px;">
+            <option value="">All Categories</option>
+            {% for c in categories %}
+            <option value="{{ c.category_id }}" {% if selected_cat == c.category_id|string %}selected{% endif %}>{{ c.category_name }}</option>
+            {% endfor %}
+        </select>
+
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); cursor: pointer; padding: 0 10px;">
+            <input type="checkbox" name="low_stock" value="1" {% if low_stock == '1' %}checked{% endif %} onchange="this.form.submit()">
+            <span>Show Low Stock Only</span>
+        </label>
+
+        <button type="submit" class="btn btn-secondary">Filter</button>
+        {% if search or selected_cat or low_stock %}
+        <a href="{{ url_for('components_list') }}" class="btn btn-secondary" style="color: var(--text-muted);">Reset</a>
+        {% endif %}
+    </form>
+
+    <!-- Components Table -->
+    <div class="table-container">
+        <table class="table-modern">
+            <thead>
+                <tr>
+                    <th>Component ID</th>
+                    <th>Component Name</th>
+                    <th>Category</th>
+                    <th>Total Stock</th>
+                    <th>Available Units</th>
+                    <th>Issued Units</th>
+                    <th>Min Threshold</th>
+                    <th>Storage Bin</th>
+                    <th>Unit Cost</th>
+                    <th>Stock Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for comp in components %}
+                <tr>
+                    <td><span class="code-pill">{{ comp.component_id }}</span></td>
+                    <td style="font-weight: 600;">
+                        {{ comp.component_name }}
+                        {% if comp.specifications %}
+                        <div style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-top: 2px;">
+                            {{ comp.specifications }}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td>{{ comp.category_name }}</td>
+                    <td style="font-weight: 600;">{{ comp.total_quantity }}</td>
+                    <td style="font-weight: 700; font-size: 15px; color: {% if comp.available_quantity <= comp.minimum_stock %}var(--accent-rose){% else %}var(--accent-emerald){% endif %};">
+                        {{ comp.available_quantity }}
+                    </td>
+                    <td style="color: var(--text-secondary);">{{ comp.issued_quantity }}</td>
+                    <td style="font-family: var(--font-mono); font-size: 12px;">{{ comp.minimum_stock }}</td>
+                    <td><span class="code-pill" style="color: var(--accent-indigo);">{{ comp.storage_bin or 'N/A' }}</span></td>
+                    <td style="font-family: var(--font-mono);">₹{{ "%.2f"|format(comp.unit_cost) }}</td>
+                    <td>
+                        {% if comp.available_quantity == 0 %}
+                            <span class="badge badge-overdue">Out of Stock</span>
+                        {% elif comp.available_quantity <= comp.minimum_stock %}
+                            <span class="badge badge-maintenance">Low Stock</span>
+                        {% else %}
+                            <span class="badge badge-available">In Stock</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        No components found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Add New Component -->
+<div id="addComponentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Add New Component to Inventory</h3>
+            <button class="modal-close" onclick="closeModal('addComponentModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('component_add') }}">
+            <div class="modal-body">
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Component ID *</label>
+                        <input type="text" name="component_id" required placeholder="e.g. C013" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Category *</label>
+                        <select name="category_id" required class="form-select">
+                            {% for c in categories %}
+                            <option value="{{ c.category_id }}">{{ c.category_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Component Name *</label>
+                    <input type="text" name="component_name" required placeholder="e.g. Raspberry Pi Camera Module V2" class="form-control">
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Total Quantity *</label>
+                        <input type="number" name="total_quantity" required min="1" value="10" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Minimum Safety Stock *</label>
+                        <input type="number" name="minimum_stock" required min="1" value="4" class="form-control">
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Unit Cost (₹)</label>
+                        <input type="number" step="0.01" name="unit_cost" value="0.00" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Storage Bin Location</label>
+                        <input type="text" name="storage_bin" placeholder="e.g. BIN-C3" class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Technical Specs</label>
+                    <textarea name="specifications" rows="2" placeholder="Operating voltage, pinout, interfaces..." class="form-control"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addComponentModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Component</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Restock Existing Component -->
+<div id="restockModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Restock Component Inventory</h3>
+            <button class="modal-close" onclick="closeModal('restockModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('component_restock') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Select Component *</label>
+                    <select name="component_id" required class="form-select">
+                        {% for c in components %}
+                        <option value="{{ c.component_id }}">{{ c.component_name }} (Current Available: {{ c.available_quantity }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Additional Quantity to Add *</label>
+                    <input type="number" name="additional_quantity" required min="1" value="10" class="form-control">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('restockModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add to Stock</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

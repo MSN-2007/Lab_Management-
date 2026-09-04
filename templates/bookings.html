@@ -1,0 +1,175 @@
+{% extends "layout.html" %}
+
+{% block title %}Equipment Bookings - RoboLab{% endblock %}
+{% block page_title %}Equipment Booking &amp; Slot Management{% endblock %}
+
+{% block content %}
+<div class="card-section">
+    <div class="section-header">
+        <div class="section-title">
+            <i class="fa-solid fa-calendar-check" style="color: var(--accent-cyan);"></i>
+            <span>Equipment Slot Reservations</span>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('createBookingModal')">
+            <i class="fa-solid fa-plus"></i>
+            <span>New Booking Request</span>
+        </button>
+    </div>
+
+    <!-- Status filter tabs -->
+    <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+        <a href="{{ url_for('bookings_list') }}" class="btn {% if not selected_status %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">All Bookings</a>
+        <a href="{{ url_for('bookings_list', status='PENDING') }}" class="btn {% if selected_status == 'PENDING' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Pending Approvals</a>
+        <a href="{{ url_for('bookings_list', status='APPROVED') }}" class="btn {% if selected_status == 'APPROVED' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Approved Slots</a>
+        <a href="{{ url_for('bookings_list', status='IN_USE') }}" class="btn {% if selected_status == 'IN_USE' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">In Session (Active)</a>
+        <a href="{{ url_for('bookings_list', status='RETURNED') }}" class="btn {% if selected_status == 'RETURNED' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Completed &amp; Returned</a>
+    </div>
+
+    <!-- Bookings Table -->
+    <div class="table-container">
+        <table class="table-modern">
+            <thead>
+                <tr>
+                    <th>Booking ID</th>
+                    <th>Equipment</th>
+                    <th>Student / Researcher</th>
+                    <th>Project</th>
+                    <th>Slot Date &amp; Time</th>
+                    <th>Purpose / Experiment</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Workflow Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in bookings %}
+                <tr>
+                    <td><span class="code-pill">#{{ b.booking_id }}</span></td>
+                    <td style="font-weight: 600;">
+                        <a href="{{ url_for('equipment_detail', equipment_id=b.equipment_id) }}" style="color: var(--text-primary); text-decoration: none;">
+                            {{ b.equipment_name }}
+                        </a>
+                        <div style="font-size: 11px; color: var(--text-muted);">{{ b.location }}</div>
+                    </td>
+                    <td>
+                        <div>{{ b.student_name }}</div>
+                        <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">{{ b.roll_number }}</div>
+                    </td>
+                    <td style="color: var(--text-secondary);">{{ b.project_name or 'Independent Lab Activity' }}</td>
+                    <td style="font-family: var(--font-mono); font-size: 12px;">
+                        <div>{{ b.booking_date }}</div>
+                        <div style="color: var(--accent-cyan);">{{ b.start_time }} - {{ b.end_time }}</div>
+                    </td>
+                    <td style="max-width: 250px; font-size: 12px; color: var(--text-secondary);">
+                        {{ b.purpose }}
+                    </td>
+                    <td>
+                        <span class="badge badge-{{ b.status.lower().replace('_', '-') }}">{{ b.status }}</span>
+                    </td>
+                    <td style="text-align: right;">
+                        {% if b.status == 'PENDING' %}
+                            <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex; gap: 4px;">
+                                <input type="hidden" name="action" value="APPROVE">
+                                <button type="submit" class="btn btn-success btn-sm">Approve</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex; gap: 4px;">
+                                <input type="hidden" name="action" value="REJECT">
+                                <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+                            </form>
+                        {% elif b.status == 'APPROVED' %}
+                            <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex;">
+                                <input type="hidden" name="action" value="START_USE">
+                                <button type="submit" class="btn btn-primary btn-sm">
+                                    <i class="fa-solid fa-play"></i> Start Session
+                                </button>
+                            </form>
+                        {% elif b.status == 'IN_USE' %}
+                            <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex;">
+                                <input type="hidden" name="action" value="COMPLETE">
+                                <button type="submit" class="btn btn-secondary btn-sm" style="border-color: var(--accent-emerald); color: var(--accent-emerald);">
+                                    <i class="fa-solid fa-check"></i> Mark Returned
+                                </button>
+                            </form>
+                        {% else %}
+                            <span style="font-size: 12px; color: var(--text-muted);">&mdash;</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        No bookings found matching current filter.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Create Booking Request -->
+<div id="createBookingModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Book Equipment Slot</h3>
+            <button class="modal-close" onclick="closeModal('createBookingModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('booking_create') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Equipment to Reserve *</label>
+                    <select name="equipment_id" required class="form-select">
+                        {% for eq in equipment %}
+                        <option value="{{ eq.equipment_id }}">{{ eq.equipment_name }} ({{ eq.equipment_id }} - {{ eq.status }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Student / Researcher *</label>
+                        <select name="user_id" required class="form-select">
+                            {% for s in students %}
+                            <option value="{{ s.user_id }}">{{ s.full_name }} ({{ s.roll_number }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Associated Project</label>
+                        <select name="project_id" class="form-select">
+                            <option value="">-- None (Independent Lab Activity) --</option>
+                            {% for p in projects %}
+                            <option value="{{ p.project_id }}">{{ p.project_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Date of Usage *</label>
+                    <input type="date" name="booking_date" required class="form-control">
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Start Time *</label>
+                        <input type="time" name="start_time" required class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">End Time *</label>
+                        <input type="time" name="end_time" required class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Purpose / Experiment Description *</label>
+                    <textarea name="purpose" required rows="3" placeholder="Describe the experiments, algorithms, or testing plan..." class="form-control"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('createBookingModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Submit Booking Request</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

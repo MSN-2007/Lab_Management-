@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+
+{% block title %}Vendors &amp; Suppliers - RoboLab{% endblock %}
+{% block page_title %}Service Partners &amp; Component Vendors{% endblock %}
+
+{% block content %}
+<div class="card-section">
+    <div class="section-header">
+        <div class="section-title">
+            <i class="fa-solid fa-truck-ramp-box" style="color: var(--accent-cyan);"></i>
+            <span>Registered Service Vendors &amp; Maintenance Partners</span>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table class="table-modern">
+            <thead>
+                <tr>
+                    <th>Vendor ID</th>
+                    <th>Company Name</th>
+                    <th>Contact Person</th>
+                    <th>Service Specialization</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Completed Jobs</th>
+                    <th>Total Billed (₹)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in vendors %}
+                <tr>
+                    <td><span class="code-pill">#{{ v.vendor_id }}</span></td>
+                    <td style="font-weight: 600;">{{ v.vendor_name }}</td>
+                    <td>{{ v.contact_person }}</td>
+                    <td><span class="code-pill" style="color: var(--accent-indigo);">{{ v.service_type }}</span></td>
+                    <td style="font-family: var(--font-mono); font-size: 12px;">{{ v.phone }}</td>
+                    <td style="font-size: 12px; color: var(--accent-cyan);">{{ v.email }}</td>
+                    <td style="font-weight: 600;">{{ v.service_jobs_count }}</td>
+                    <td style="font-family: var(--font-mono); font-weight: 600;">₹{{ "%.2f"|format(v.total_billed) }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        No vendors found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

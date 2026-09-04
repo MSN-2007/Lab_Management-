@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - RoboLab Robotics Management</title>
+    <!-- Offline FontAwesome Icons (Local) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fontawesome.min.css') }}">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body style="display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px;">
+    <div style="width: 100%; max-width: 900px;">
+        <!-- Brand Header -->
+        <div style="text-align: center; margin-bottom: 28px;">
+            <div style="display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; background: var(--accent-primary); border-radius: var(--radius-md); font-size: 24px; color: white; margin-bottom: 12px;">
+                <i class="fa-solid fa-robot"></i>
+            </div>
+            <h1 style="font-family: var(--font-heading); font-size: 24px; font-weight: 700; margin-bottom: 4px; color: var(--text-primary);">
+                RoboLab Portal Login
+            </h1>
+            <p style="color: var(--text-secondary); font-size: 13px;">
+                Robotics Laboratory Equipment &amp; Component Management System
+            </p>
+        </div>
+
+        <!-- Flash alerts -->
+        <div class="flash-container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            <span>{{ message }}</span>
+                            <button onclick="this.parentElement.remove()" style="background:none; border:none; color:inherit; cursor:pointer;">&times;</button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <!-- 1-Click Role Login Cards Grid -->
+        <div class="card-section" style="margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                <div style="font-family: var(--font-heading); font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-bolt" style="color: var(--accent-amber);"></i>
+                    <span>Quick 1-Click Role Logins (Demo Personas)</span>
+                </div>
+                <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-muted);">No Password Required</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px;">
+                <!-- Admin Card -->
+                <a href="{{ url_for('switch_role', user_id=1) }}" style="text-decoration: none; color: inherit;">
+                    <div class="metric-card" style="padding: 14px; cursor: pointer; height: 100%;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span class="badge badge-available">ADMIN</span>
+                            <i class="fa-solid fa-shield-halved" style="color: var(--accent-primary);"></i>
+                        </div>
+                        <div style="font-weight: 600; font-size: 14px;">Dr. Rajesh Sharma</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">System Incharge</div>
+                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+                            Full access to all lab inventory, approvals, and reports.
+                        </div>
+                    </div>
+                </a>
+
+                <!-- Technician Card -->
+                <a href="{{ url_for('switch_role', user_id=2) }}" style="text-decoration: none; color: inherit;">
+                    <div class="metric-card" style="padding: 14px; cursor: pointer; height: 100%;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span class="badge badge-in_use">TECHNICIAN</span>
+                            <i class="fa-solid fa-screwdriver-wrench" style="color: var(--accent-blue);"></i>
+                        </div>
+                        <div style="font-weight: 600; font-size: 14px;">Vikram Verma</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">Lab Technician</div>
+                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+                            Issue/return items, restock units, report maintenance.
+                        </div>
+                    </div>
+                </a>
+
+                <!-- Faculty Card -->
+                <a href="{{ url_for('switch_role', user_id=3) }}" style="text-decoration: none; color: inherit;">
+                    <div class="metric-card" style="padding: 14px; cursor: pointer; height: 100%;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span class="badge badge-pending">FACULTY</span>
+                            <i class="fa-solid fa-chalkboard-user" style="color: var(--accent-purple);"></i>
+                        </div>
+                        <div style="font-weight: 600; font-size: 14px;">Dr. Ananya Iyer</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">Project Guide</div>
+                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+                            Approve student bookings, evaluate project teams.
+                        </div>
+                    </div>
+                </a>
+
+                <!-- Student Card -->
+                <a href="{{ url_for('switch_role', user_id=5) }}" style="text-decoration: none; color: inherit;">
+                    <div class="metric-card" style="padding: 14px; cursor: pointer; height: 100%;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span class="badge badge-available">STUDENT</span>
+                            <i class="fa-solid fa-graduation-cap" style="color: var(--accent-emerald);"></i>
+                        </div>
+                        <div style="font-weight: 600; font-size: 14px;">Sufiyan Khan</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">RA21110030101</div>
+                        <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+                            View personal issued items, request bookings &amp; projects.
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Direct Email / Roll Number Login Box -->
+        <div class="card-section" style="max-width: 440px; margin: 0 auto;">
+            <div style="font-family: var(--font-heading); font-size: 14px; font-weight: 600; margin-bottom: 14px; text-align: center;">
+                Or Login with Email / Roll Number
+            </div>
+            <form method="POST" action="{{ url_for('login') }}">
+                <div class="form-group">
+                    <label class="form-label">Email Address or Roll Number</label>
+                    <input type="text" name="email" required placeholder="e.g. sufiyan.k@student.robolab.edu or RA21110030101" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" name="password" placeholder="•••••••• (Any password for demo)" class="form-control">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 6px;">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                    <span>Sign In to RoboLab</span>
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
