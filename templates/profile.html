@@ -1,0 +1,94 @@
+{% extends "layout.html" %}
+
+{% block title %}My Profile - RoboLab{% endblock %}
+{% block page_title %}My Profile &amp; Account Settings{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr 2fr; gap: 24px; align-items: start;">
+    <!-- Profile Summary Card -->
+    <div class="card-section">
+        <div style="text-align: center; padding: 12px 0;">
+            <div class="user-avatar" style="width: 72px; height: 72px; font-size: 28px; margin: 0 auto 16px; border: 3px solid var(--accent-primary);">
+                {{ user.full_name[:2].upper() }}
+            </div>
+            <h2 style="font-family: var(--font-heading); font-size: 18px; font-weight: 700; margin-bottom: 4px;">
+                {{ user.full_name }}
+            </h2>
+            <div style="margin-bottom: 12px;">
+                <span class="badge badge-available">{{ user.role_name }}</span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.6;">
+                <div><i class="fa-solid fa-envelope" style="color: var(--accent-cyan); margin-right: 6px;"></i> {{ user.email }}</div>
+                <div><i class="fa-solid fa-id-badge" style="color: var(--accent-primary); margin-right: 6px;"></i> {{ user.roll_number or 'Staff / Faculty ID' }}</div>
+                <div><i class="fa-solid fa-building" style="color: var(--accent-purple); margin-right: 6px;"></i> {{ user.department }}</div>
+            </div>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-color); margin-top: 18px; padding-top: 16px;">
+            <div style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary);">Personal Lab Activity</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
+                <div style="background: var(--bg-primary); padding: 10px 6px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <div style="font-size: 18px; font-weight: 700; color: var(--accent-emerald);">{{ allocations_count }}</div>
+                    <div style="font-size: 10px; color: var(--text-muted);">Active Loans</div>
+                </div>
+                <div style="background: var(--bg-primary); padding: 10px 6px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <div style="font-size: 18px; font-weight: 700; color: var(--accent-blue);">{{ bookings_count }}</div>
+                    <div style="font-size: 10px; color: var(--text-muted);">Bookings</div>
+                </div>
+                <div style="background: var(--bg-primary); padding: 10px 6px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <div style="font-size: 18px; font-weight: 700; color: var(--accent-purple);">{{ projects_count }}</div>
+                    <div style="font-size: 10px; color: var(--text-muted);">Projects</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Profile Form Card -->
+    <div class="card-section">
+        <div class="section-header">
+            <div class="section-title">
+                <i class="fa-solid fa-user-pen" style="color: var(--accent-cyan);"></i>
+                <span>Update Profile Details</span>
+            </div>
+        </div>
+
+        <form method="POST" action="{{ url_for('profile') }}">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Full Name *</label>
+                    <input type="text" name="full_name" required value="{{ user.full_name }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Email Address (Read-only)</label>
+                    <input type="email" disabled value="{{ user.email }}" class="form-control" style="opacity: 0.7; cursor: not-allowed;">
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Roll Number / Staff ID</label>
+                    <input type="text" name="roll_number" value="{{ user.roll_number or '' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Contact Phone</label>
+                    <input type="text" name="phone" value="{{ user.phone or '' }}" placeholder="+91 9876543210" class="form-control">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Department / Branch</label>
+                <input type="text" name="department" value="{{ user.department }}" class="form-control">
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Save Profile Changes</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -28,6 +28,8 @@
 
 ## 🌟 Key Highlights & Innovations
 
+* 🎭 **Live Demo Showcase vs. Clean Slate Mode:** Instant 1-click launch with rich mock robotics lab data (equipment, components, bookings, breakdowns) for demonstrations, alongside an instant **"Reset to Clean Slate"** mode allowing users to create custom accounts and add real lab assets from scratch.
+* 👤 **Self-Registration & User Assignment Portal:** Dedicated `/register` portal for users to create their own profiles across all roles (`Student`, `Faculty`, `Lab Technician`, `Admin`), alongside an administrative `/users` management interface to assign and edit roles.
 * ⚡ **Dual-Engine Database Architecture:** Runs seamlessly with **MySQL 8.x** in production and features automatic zero-configuration fallback to **SQLite 3** for instant local evaluation.
 * 🛡️ **3NF Normalized Relational Schema:** Strictly normalized across **18 interconnected relational tables**, complete with foreign key constraints, cascading rules, and ACID transaction guarantees.
 * 🔄 **Automated Inventory Control Triggers:** Dynamic inventory stock decrement on component allocation and intelligent restocking upon quality-verified returns.
@@ -43,7 +45,13 @@
 ### 1. 📊 Executive & Role-Specific Dashboard
 * High-level KPI counters: Total Equipment, Available Workstations, In-Maintenance Machinery, Active Student Allocations, and Active Projects.
 * Real-time **Low Stock Shortage Banner** highlighting components that require immediate restock.
+* Dynamic onboarding banner when operating in **Clean Slate Mode** with quick-action links to add equipment, components, or load sample showcase data.
 * Role-tailored views displaying customized action items for Students, Faculty, and Lab Technicians.
+
+### 2. 👤 Account Registration & User Role Management
+* Public `/register` interface allowing new members to create accounts with custom department and roll/staff identifiers.
+* Administrative `/users` directory with search, role filters, assignment modal, and activity counters (loans, bookings, projects).
+* Personal `/profile` dashboard for managing contact info and viewing individual laboratory activity.
 
 ### 2. 🦾 High-Value Equipment Management
 * Catalog for multi-axis robotic arms, 3D printers, CNC PCB routers, oscilloscopes, and ROS2 mobile robots.

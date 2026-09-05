@@ -2,13 +2,13 @@ import os
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from config import Config
-from db import query_db, execute_db, is_using_sqlite
+from db import query_db, execute_db, is_using_sqlite, is_demo_loaded, load_demo_showcase_data, reset_to_clean_slate
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
 def get_current_user():
-    """Returns the currently logged-in user record or default demo user."""
+    """Returns the currently logged-in user record or default user."""
     user_id = session.get('user_id')
     if not user_id:
         return None
@@ -29,23 +29,25 @@ def inject_global_metrics():
         pending_bookings = query_db("SELECT COUNT(*) AS cnt FROM BOOKINGS WHERE status = 'PENDING'", one=True)
         low_stock_count = query_db("SELECT COUNT(*) AS cnt FROM COMPONENTS WHERE available_quantity <= minimum_stock", one=True)
         engine_mode = "SQLite (Local Auto-Sync)" if is_using_sqlite() else "MySQL (Production)"
+        demo_active = is_demo_loaded()
         
         # Fetch list of quick-switch users for the topbar
         all_demo_users = query_db("""
             SELECT u.user_id, u.full_name, u.email, u.roll_number, r.role_name
             FROM USERS u
             JOIN ROLES r ON u.role_id = r.role_id
-            WHERE u.user_id IN (1, 2, 3, 5)
             ORDER BY u.user_id ASC
+            LIMIT 10
         """)
         
         return {
             'current_user': user,
-            'demo_users': all_demo_users,
+            'demo_users': all_demo_users or [],
             'unread_notifications_count': unread_notifs['cnt'] if unread_notifs else 0,
             'pending_bookings_count': pending_bookings['cnt'] if pending_bookings else 0,
             'low_stock_alerts_count': low_stock_count['cnt'] if low_stock_count else 0,
-            'database_engine': engine_mode
+            'database_engine': engine_mode,
+            'is_demo_mode': demo_active
         }
     except Exception:
         return {
@@ -54,21 +56,28 @@ def inject_global_metrics():
             'unread_notifications_count': 0,
             'pending_bookings_count': 0,
             'low_stock_alerts_count': 0,
-            'database_engine': 'Database Initializing'
+            'database_engine': 'Database Initializing',
+            'is_demo_mode': False
         }
 
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
-            # For convenience in tests/demo, auto-login as Admin if not set
-            session['user_id'] = 1
-            session['role_name'] = 'Admin'
+            # Auto-fallback to first available user
+            first_user = query_db("SELECT u.user_id, r.role_name, u.full_name FROM USERS u JOIN ROLES r ON u.role_id = r.role_id ORDER BY u.user_id ASC LIMIT 1", one=True)
+            if first_user:
+                session['user_id'] = first_user['user_id']
+                session['role_name'] = first_user['role_name']
+                session['full_name'] = first_user['full_name']
+            else:
+                session['user_id'] = 1
+                session['role_name'] = 'Admin'
         return f(*args, **kwargs)
     return decorated_function
 
 # ------------------------------------------------------------------------------
-# AUTHENTICATION & ROLE SWITCHING
+# AUTHENTICATION, REGISTRATION & DEMO CONTROL
 # ------------------------------------------------------------------------------
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -90,7 +99,7 @@ def login():
             flash(f"Welcome back, {user['full_name']} ({user['role_name']})!", 'success')
             return redirect(url_for('dashboard'))
         else:
-            flash("Invalid email or roll number. Try using the 1-Click Role Login buttons below.", 'danger')
+            flash("Invalid email or roll/staff number. If this is a new profile, please Register first or click 'Run Live Demo Showcase'.", 'danger')
 
     # Demo personas for quick 1-click login
     demo_roles = query_db("""
@@ -100,7 +109,104 @@ def login():
         WHERE u.user_id IN (1, 2, 3, 5)
         ORDER BY u.user_id ASC
     """)
-    return render_template('login.html', demo_roles=demo_roles)
+    demo_active = is_demo_loaded()
+    return render_template('login.html', demo_roles=demo_roles or [], is_demo_mode=demo_active)
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    roles = query_db("SELECT * FROM ROLES ORDER BY role_id ASC") or []
+    if request.method == 'POST':
+        full_name = request.form.get('full_name', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        role_id = int(request.form.get('role_id', 4))
+        roll_number = request.form.get('roll_number', '').strip() or None
+        department = request.form.get('department', 'Robotics & Automation').strip()
+        phone = request.form.get('phone', '').strip()
+        password = request.form.get('password', 'default123').strip()
+        
+        if not full_name or not email:
+            flash("Full name and email address are required.", "danger")
+            return render_template('register.html', roles=roles)
+            
+        existing = query_db("SELECT * FROM USERS WHERE LOWER(email) = %s OR (roll_number IS NOT NULL AND roll_number = %s)", [email, roll_number], one=True)
+        if existing:
+            flash("An account with this email address or roll/staff ID already exists. Please log in.", "warning")
+            return redirect(url_for('login'))
+            
+        try:
+            new_user_id = execute_db("""
+                INSERT INTO USERS (role_id, full_name, email, password_hash, roll_number, phone, department)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, [role_id, full_name, email, password, roll_number, phone, department])
+            
+            user = query_db("""
+                SELECT u.*, r.role_name
+                FROM USERS u
+                JOIN ROLES r ON u.role_id = r.role_id
+                WHERE u.user_id = %s
+            """, [new_user_id], one=True)
+            
+            session['user_id'] = user['user_id']
+            session['full_name'] = user['full_name']
+            session['role_name'] = user['role_name']
+            session['role_id'] = user['role_id']
+            
+            flash(f"Profile created successfully! Welcome to RoboLab, {user['full_name']} ({user['role_name']}).", "success")
+            return redirect(url_for('dashboard'))
+        except Exception as e:
+            flash(f"Error registering account: {str(e)}", "danger")
+            return render_template('register.html', roles=roles)
+            
+    return render_template('register.html', roles=roles)
+
+@app.route('/launch-demo')
+def launch_demo():
+    if not is_demo_loaded():
+        load_demo_showcase_data()
+    user = query_db("SELECT u.*, r.role_name FROM USERS u JOIN ROLES r ON u.role_id = r.role_id WHERE u.user_id = 1", one=True)
+    if user:
+        session['user_id'] = user['user_id']
+        session['full_name'] = user['full_name']
+        session['role_name'] = user['role_name']
+        session['role_id'] = user['role_id']
+        flash(f"✨ Launched Live Demo Showcase as {user['full_name']} ({user['role_name']}) with preloaded robotics equipment, components, and bookings!", "success")
+    return redirect(url_for('dashboard'))
+
+@app.route('/demo-login/<int:user_id>')
+def demo_login(user_id):
+    if not is_demo_loaded():
+        load_demo_showcase_data()
+    user = query_db("SELECT u.*, r.role_name FROM USERS u JOIN ROLES r ON u.role_id = r.role_id WHERE u.user_id = %s", [user_id], one=True)
+    if user:
+        session['user_id'] = user['user_id']
+        session['full_name'] = user['full_name']
+        session['role_name'] = user['role_name']
+        session['role_id'] = user['role_id']
+        flash(f"✨ Switched active persona to: {user['full_name']} ({user['role_name']})", "success")
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
+
+@app.route('/database/load-demo', methods=['GET', 'POST'])
+def db_load_demo():
+    load_demo_showcase_data()
+    user = query_db("SELECT u.*, r.role_name FROM USERS u JOIN ROLES r ON u.role_id = r.role_id WHERE u.user_id = 1", one=True)
+    if user:
+        session['user_id'] = user['user_id']
+        session['role_name'] = user['role_name']
+        session['full_name'] = user['full_name']
+    flash("✨ Live Demo Showcase data loaded! All sample equipment, components, allocations, and bookings are ready to explore.", "success")
+    return redirect(request.referrer or url_for('dashboard'))
+
+@app.route('/database/reset-clean', methods=['GET', 'POST'])
+def db_reset_clean():
+    reset_to_clean_slate()
+    user = query_db("SELECT u.*, r.role_name FROM USERS u JOIN ROLES r ON u.role_id = r.role_id WHERE u.user_id = 1", one=True)
+    if user:
+        session['user_id'] = user['user_id']
+        session['role_name'] = user['role_name']
+        session['full_name'] = user['full_name']
+    flash("🧹 Database reset to Clean Slate. All sample equipment, components, and bookings cleared. Ready for your own custom laboratories and profiles!", "info")
+    return redirect(request.referrer or url_for('dashboard'))
 
 @app.route('/logout')
 def logout():
@@ -123,6 +229,138 @@ def switch_role(user_id):
         session['role_id'] = user['role_id']
         flash(f"Switched active persona to: {user['full_name']} ({user['role_name']})", 'success')
     return redirect(request.referrer or url_for('dashboard'))
+
+# ------------------------------------------------------------------------------
+# 0. USER ACCOUNTS MANAGEMENT & PROFILE
+# ------------------------------------------------------------------------------
+@app.route('/users')
+@login_required
+def users_list():
+    role_filter = request.args.get('role', '')
+    search_query = request.args.get('q', '').strip()
+    
+    sql = """
+        SELECT u.*, r.role_name,
+               (SELECT COUNT(*) FROM BOOKINGS b WHERE b.user_id = u.user_id) AS total_bookings,
+               (SELECT COUNT(*) FROM EQUIPMENT_ALLOCATION ea WHERE ea.user_id = u.user_id AND ea.status = 'Issued') AS active_loans,
+               (SELECT COUNT(*) FROM PROJECT_MEMBERS pm WHERE pm.user_id = u.user_id) AS project_count
+        FROM USERS u
+        JOIN ROLES r ON u.role_id = r.role_id
+        WHERE 1=1
+    """
+    params = []
+    if role_filter:
+        sql += " AND r.role_name = %s"
+        params.append(role_filter)
+    if search_query:
+        sql += " AND (u.full_name LIKE %s OR u.email LIKE %s OR u.roll_number LIKE %s OR u.department LIKE %s)"
+        term = f"%{search_query}%"
+        params.extend([term, term, term, term])
+        
+    sql += " ORDER BY u.role_id ASC, u.user_id ASC"
+    users = query_db(sql, params)
+    roles = query_db("SELECT * FROM ROLES ORDER BY role_id ASC") or []
+    
+    return render_template('users.html', users=users, roles=roles, selected_role=role_filter, search=search_query)
+
+@app.route('/users/add', methods=['POST'])
+@login_required
+def users_add():
+    full_name = request.form.get('full_name', '').strip()
+    email = request.form.get('email', '').strip().lower()
+    role_id = int(request.form.get('role_id', 4))
+    roll_number = request.form.get('roll_number', '').strip() or None
+    department = request.form.get('department', 'Robotics & Automation').strip()
+    phone = request.form.get('phone', '').strip()
+    
+    if not full_name or not email:
+        flash("Full Name and Email are required.", "danger")
+        return redirect(url_for('users_list'))
+        
+    try:
+        execute_db("""
+            INSERT INTO USERS (role_id, full_name, email, roll_number, phone, department)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, [role_id, full_name, email, roll_number, phone, department])
+        flash(f"New account for '{full_name}' assigned successfully!", "success")
+    except Exception as e:
+        flash(f"Error creating account: {str(e)}", "danger")
+        
+    return redirect(url_for('users_list'))
+
+@app.route('/users/edit/<int:user_id>', methods=['POST'])
+@login_required
+def users_edit(user_id):
+    full_name = request.form.get('full_name', '').strip()
+    email = request.form.get('email', '').strip().lower()
+    role_id = int(request.form.get('role_id', 4))
+    roll_number = request.form.get('roll_number', '').strip() or None
+    department = request.form.get('department', '').strip()
+    phone = request.form.get('phone', '').strip()
+    
+    try:
+        execute_db("""
+            UPDATE USERS
+            SET full_name = %s, email = %s, role_id = %s, roll_number = %s, department = %s, phone = %s
+            WHERE user_id = %s
+        """, [full_name, email, role_id, roll_number, department, phone, user_id])
+        flash(f"Account for '{full_name}' updated successfully.", "success")
+    except Exception as e:
+        flash(f"Error updating account: {str(e)}", "danger")
+        
+    return redirect(url_for('users_list'))
+
+@app.route('/users/delete/<int:user_id>', methods=['POST'])
+@login_required
+def users_delete(user_id):
+    curr = session.get('user_id')
+    if curr == user_id:
+        flash("You cannot delete your own currently active account.", "warning")
+        return redirect(url_for('users_list'))
+        
+    try:
+        execute_db("DELETE FROM USERS WHERE user_id = %s", [user_id])
+        flash(f"Account #{user_id} deleted successfully.", "info")
+    except Exception as e:
+        flash(f"Error deleting user (they may have active bookings or loans): {str(e)}", "danger")
+        
+    return redirect(url_for('users_list'))
+
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('login'))
+        
+    if request.method == 'POST':
+        full_name = request.form.get('full_name', user['full_name']).strip()
+        phone = request.form.get('phone', user['phone']).strip()
+        department = request.form.get('department', user['department']).strip()
+        roll_number = request.form.get('roll_number', user['roll_number']).strip()
+        
+        try:
+            execute_db("""
+                UPDATE USERS
+                SET full_name = %s, phone = %s, department = %s, roll_number = %s
+                WHERE user_id = %s
+            """, [full_name, phone, department, roll_number, user['user_id']])
+            session['full_name'] = full_name
+            flash("Profile updated successfully!", "success")
+            return redirect(url_for('profile'))
+        except Exception as e:
+            flash(f"Error updating profile: {str(e)}", "danger")
+            
+    # User activity statistics
+    bookings_res = query_db("SELECT COUNT(*) AS cnt FROM BOOKINGS WHERE user_id = %s", [user['user_id']], one=True)
+    allocations_res = query_db("SELECT COUNT(*) AS cnt FROM EQUIPMENT_ALLOCATION WHERE user_id = %s AND status = 'Issued'", [user['user_id']], one=True)
+    projects_res = query_db("SELECT COUNT(*) AS cnt FROM PROJECT_MEMBERS WHERE user_id = %s", [user['user_id']], one=True)
+    
+    bookings_count = bookings_res['cnt'] if bookings_res else 0
+    allocations_count = allocations_res['cnt'] if allocations_res else 0
+    projects_count = projects_res['cnt'] if projects_res else 0
+    
+    return render_template('profile.html', user=user, bookings_count=bookings_count, allocations_count=allocations_count, projects_count=projects_count)
 
 # ------------------------------------------------------------------------------
 # 1. DASHBOARD & ROLE-TAILORED OVERVIEW

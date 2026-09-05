@@ -1,0 +1,248 @@
+{% extends "layout.html" %}
+
+{% block title %}User Accounts - RoboLab{% endblock %}
+{% block page_title %}User Accounts &amp; Role Management{% endblock %}
+
+{% block content %}
+<div class="card-section">
+    <div class="section-header">
+        <div class="section-title">
+            <i class="fa-solid fa-users-gear" style="color: var(--accent-cyan);"></i>
+            <span>Registered Laboratory Profiles &amp; Accounts</span>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('addUserModal')">
+            <i class="fa-solid fa-user-plus"></i>
+            <span>Assign / Create New Account</span>
+        </button>
+    </div>
+
+    <!-- Filter & Search Controls -->
+    <form method="GET" action="{{ url_for('users_list') }}" style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
+        <input type="text" name="q" value="{{ search }}" placeholder="Search by name, email, roll ID or department..." class="form-control" style="flex: 2; min-width: 200px;">
+        
+        <select name="role" class="form-select" style="flex: 1; min-width: 160px;">
+            <option value="">All Roles</option>
+            {% for r in roles %}
+            <option value="{{ r.role_name }}" {% if selected_role == r.role_name %}selected{% endif %}>{{ r.role_name }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit" class="btn btn-secondary">Filter</button>
+        {% if search or selected_role %}
+        <a href="{{ url_for('users_list') }}" class="btn btn-secondary" style="color: var(--text-muted);">Reset</a>
+        {% endif %}
+    </form>
+
+    <!-- Users Table -->
+    <div class="table-container">
+        <table class="table-modern">
+            <thead>
+                <tr>
+                    <th>User ID</th>
+                    <th>Full Name</th>
+                    <th>Role</th>
+                    <th>Email Address</th>
+                    <th>Roll / Staff ID</th>
+                    <th>Department</th>
+                    <th>Contact Phone</th>
+                    <th>Activity Stats</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td><span class="code-pill">#{{ u.user_id }}</span></td>
+                    <td style="font-weight: 600;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div class="user-avatar" style="width: 28px; height: 28px; font-size: 11px;">
+                                {{ u.full_name[:2].upper() }}
+                            </div>
+                            <span>{{ u.full_name }}</span>
+                            {% if current_user and current_user.user_id == u.user_id %}
+                                <span class="badge badge-available" style="font-size: 10px; padding: 1px 5px;">You</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        {% if u.role_name == 'Admin' %}
+                            <span class="badge badge-available">ADMIN</span>
+                        {% elif u.role_name == 'Lab Technician' %}
+                            <span class="badge badge-in_use">TECHNICIAN</span>
+                        {% elif u.role_name == 'Faculty' %}
+                            <span class="badge badge-pending">FACULTY</span>
+                        {% else %}
+                            <span class="badge badge-available" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald);">STUDENT</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary);">{{ u.email }}</td>
+                    <td><span class="code-pill">{{ u.roll_number or 'N/A' }}</span></td>
+                    <td style="color: var(--text-secondary);">{{ u.department }}</td>
+                    <td style="font-family: var(--font-mono); font-size: 12px;">{{ u.phone or '—' }}</td>
+                    <td>
+                        <div style="font-size: 11px; color: var(--text-muted); display: flex; gap: 8px;">
+                            <span title="Active Equipment Loans"><i class="fa-solid fa-hand-holding" style="color: var(--accent-cyan);"></i> {{ u.active_loans }}</span>
+                            <span title="Equipment Bookings"><i class="fa-solid fa-calendar-check" style="color: var(--accent-emerald);"></i> {{ u.total_bookings }}</span>
+                            <span title="Projects"><i class="fa-solid fa-diagram-project" style="color: var(--accent-purple);"></i> {{ u.project_count }}</span>
+                        </div>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: flex; gap: 6px; justify-content: flex-end;">
+                            <a href="{{ url_for('switch_role', user_id=u.user_id) }}" class="btn btn-secondary btn-sm" title="Log in as this persona">
+                                <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                                <span>Switch</span>
+                            </a>
+                            <button class="btn btn-secondary btn-sm" onclick="openEditUserModal('{{ u.user_id }}', '{{ u.full_name }}', '{{ u.email }}', '{{ u.role_id }}', '{{ u.roll_number or '' }}', '{{ u.department }}', '{{ u.phone or '' }}')" title="Edit Account">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            {% if not (current_user and current_user.user_id == u.user_id) %}
+                            <form method="POST" action="{{ url_for('users_delete', user_id=u.user_id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete account #{{ u.user_id }} ({{ u.full_name }})?');">
+                                <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--accent-rose);" title="Delete Account">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        No user profiles match the selected criteria.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Add New Account -->
+<div id="addUserModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Assign / Create New Lab Account</h3>
+            <button class="modal-close" onclick="closeModal('addUserModal')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('users_add') }}">
+            <div class="modal-body">
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Full Name *</label>
+                        <input type="text" name="full_name" required placeholder="e.g. Jordan Lee" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Email Address *</label>
+                        <input type="email" name="email" required placeholder="e.g. jordan.l@robolab.edu" class="form-control">
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Role Assignment *</label>
+                        <select name="role_id" required class="form-select">
+                            {% for r in roles %}
+                            <option value="{{ r.role_id }}">{{ r.role_name }} - {{ r.description }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Roll Number / Staff ID</label>
+                        <input type="text" name="roll_number" placeholder="e.g. RA26110030105 or TECH003" class="form-control">
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Department</label>
+                        <input type="text" name="department" value="Robotics &amp; Automation" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Contact Phone</label>
+                        <input type="text" name="phone" placeholder="+91 9876543210" class="form-control">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addUserModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create &amp; Assign Account</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Edit User -->
+<div id="editUserModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Edit User Profile &amp; Role</h3>
+            <button class="modal-close" onclick="closeModal('editUserModal')">&times;</button>
+        </div>
+        <form id="editUserForm" method="POST" action="">
+            <div class="modal-body">
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Full Name *</label>
+                        <input type="text" id="edit_full_name" name="full_name" required class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Email Address *</label>
+                        <input type="email" id="edit_email" name="email" required class="form-control">
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Role *</label>
+                        <select id="edit_role_id" name="role_id" required class="form-select">
+                            {% for r in roles %}
+                            <option value="{{ r.role_id }}">{{ r.role_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Roll Number / Staff ID</label>
+                        <input type="text" id="edit_roll_number" name="roll_number" class="form-control">
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Department</label>
+                        <input type="text" id="edit_department" name="department" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Contact Phone</label>
+                        <input type="text" id="edit_phone" name="phone" class="form-control">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editUserModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openEditUserModal(id, name, email, roleId, rollNo, dept, phone) {
+    document.getElementById('editUserForm').action = '/users/edit/' + id;
+    document.getElementById('edit_full_name').value = name;
+    document.getElementById('edit_email').value = email;
+    document.getElementById('edit_role_id').value = roleId;
+    document.getElementById('edit_roll_number').value = rollNo;
+    document.getElementById('edit_department').value = dept;
+    document.getElementById('edit_phone').value = phone;
+    openModal('editUserModal');
+}
+</script>
+{% endblock %}
