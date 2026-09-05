@@ -280,8 +280,8 @@ RoboLab includes pre-compiled relational views and complex queries ideal for aca
 
 ### Step 1: Clone the Repository
 ```bash
-git clone https://github.com/your-username/SQL_PBL.git
-cd SQL_PBL
+git clone https://github.com/MSN-2007/Lab_Management-.git
+cd Lab_Management-
 ```
 
 ### Step 2: Create and Activate a Virtual Environment

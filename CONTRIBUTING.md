@@ -9,8 +9,8 @@ Thank you for your interest in contributing to **RoboLab**! We welcome contribut
 1. **Fork the repository** on GitHub.
 2. **Clone your fork locally**:
    ```bash
-   git clone https://github.com/your-username/SQL_PBL.git
-   cd SQL_PBL
+   git clone https://github.com/MSN-2007/Lab_Management-.git
+   cd Lab_Management-
    ```
 3. **Create and activate a virtual environment**:
    ```bash
