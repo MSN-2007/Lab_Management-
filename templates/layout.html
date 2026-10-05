@@ -115,9 +115,9 @@
             </ul>
 
             <div class="sidebar-footer">
-                <div style="background: var(--bg-primary); padding: 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 8px; font-size: 11px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                        <span style="font-weight: 600; color: {% if is_demo_mode %}var(--accent-emerald){% else %}var(--accent-amber){% endif %};">
+                <div style="background: #1e1e1e; padding: 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); margin-bottom: 8px; font-size: 11px;">
+                    <div style="margin-bottom: 4px;">
+                        <span style="font-weight: 600; color: var(--text-muted);">
                             <i class="fa-solid {% if is_demo_mode %}fa-flask{% else %}fa-broom{% endif %}"></i>
                             {{ 'Demo Data Active' if is_demo_mode else 'Clean Slate Mode' }}
                         </span>
@@ -125,10 +125,10 @@
                     <div style="display: flex; gap: 4px;">
                         {% if is_demo_mode %}
                         <a href="{{ url_for('db_reset_clean') }}" class="btn btn-secondary btn-sm" style="padding: 2px 6px; font-size: 10px; width: 100%; justify-content: center;" onclick="return confirm('Clear sample data and switch to clean empty mode?')">
-                            <i class="fa-solid fa-eraser"></i> Reset Clean
+                            <i class="fa-solid fa-eraser"></i> Reset
                         </a>
                         {% else %}
-                        <a href="{{ url_for('db_load_demo') }}" class="btn btn-primary btn-sm" style="padding: 2px 6px; font-size: 10px; width: 100%; justify-content: center;">
+                        <a href="{{ url_for('db_load_demo') }}" class="btn btn-secondary btn-sm" style="padding: 2px 6px; font-size: 10px; width: 100%; justify-content: center;">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Load Demo
                         </a>
                         {% endif %}
@@ -182,7 +182,7 @@
                             </div>
                             <div>
                                 <div style="font-weight: 600; font-size: 13px;">{{ current_user.full_name if current_user else 'Guest' }}</div>
-                                <div style="font-size: 11px; color: var(--accent-primary); font-family: var(--font-mono);">
+                                <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
                                     {{ current_user.role_name if current_user else 'Visitor' }}
                                 </div>
                             </div>
