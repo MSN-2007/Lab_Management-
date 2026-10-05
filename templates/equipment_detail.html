@@ -4,72 +4,71 @@
 {% block page_title %}{{ eq.equipment_name }}{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 20px;">
+
+{# Back Link #}
+<div style="margin-bottom: 16px;">
     <a href="{{ url_for('equipment_list') }}" class="btn btn-secondary btn-sm">
-        <i class="fa-solid fa-arrow-left"></i>
-        <span>Back to Equipment Catalog</span>
+        <i class="fa-solid fa-arrow-left"></i> Back to Equipment Catalog
     </a>
 </div>
 
-<!-- Equipment Specs Header Card -->
+{# Equipment Header Card #}
 <div class="card-section" style="border-top: 3px solid var(--accent-cyan);">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 20px;">
+
         <div>
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                <span class="code-pill" style="font-size: 16px; padding: 4px 12px;">{{ eq.equipment_id }}</span>
-                <h2 style="font-family: var(--font-heading); font-size: 24px; font-weight: 700;">{{ eq.equipment_name }}</h2>
-                <span class="badge badge-{{ eq.status.lower().replace(' ', '-') }}" style="font-size: 13px; padding: 4px 12px;">{{ eq.status }}</span>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+                <span class="code-pill">{{ eq.equipment_id }}</span>
+                <h2 style="font-size: 22px; font-weight: 700;">{{ eq.equipment_name }}</h2>
+                <span class="badge badge-{{ eq.status.lower().replace(' ', '-') }}">{{ eq.status }}</span>
             </div>
-            <p style="color: var(--text-secondary); max-width: 700px; margin-bottom: 16px;">{{ eq.description }}</p>
-            
-            <div style="display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px;">
-                <div>
-                    <span style="color: var(--text-muted);">Category:</span>
-                    <strong style="color: var(--text-primary); margin-left: 4px;">{{ eq.category_name }}</strong>
-                </div>
-                <div>
-                    <span style="color: var(--text-muted);">Laboratory:</span>
-                    <strong style="color: var(--text-primary); margin-left: 4px;">{{ eq.lab_name }} ({{ eq.location_code }})</strong>
-                </div>
-                <div>
-                    <span style="color: var(--text-muted);">Workstation:</span>
-                    <strong style="color: var(--text-primary); margin-left: 4px;">{{ eq.location }}</strong>
-                </div>
-                <div>
-                    <span style="color: var(--text-muted);">Serial Number:</span>
-                    <span class="code-pill" style="margin-left: 4px;">{{ eq.serial_number or 'N/A' }}</span>
-                </div>
-                <div>
-                    <span style="color: var(--text-muted);">Purchase Date:</span>
-                    <strong style="color: var(--text-primary); margin-left: 4px;">{{ eq.purchase_date }}</strong>
-                </div>
+
+            <p style="color: var(--text-secondary); max-width: 680px; margin-bottom: 14px;">{{ eq.description }}</p>
+
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 13px;">
+                <div><span style="color: var(--text-muted);">Category:</span>
+                    <strong style="margin-left: 4px;">{{ eq.category_name }}</strong></div>
+                <div><span style="color: var(--text-muted);">Laboratory:</span>
+                    <strong style="margin-left: 4px;">{{ eq.lab_name }} ({{ eq.location_code }})</strong></div>
+                <div><span style="color: var(--text-muted);">Workstation:</span>
+                    <strong style="margin-left: 4px;">{{ eq.location }}</strong></div>
+                <div><span style="color: var(--text-muted);">Serial No.:</span>
+                    <span class="code-pill" style="margin-left: 4px;">{{ eq.serial_number or 'N/A' }}</span></div>
+                <div><span style="color: var(--text-muted);">Purchase Date:</span>
+                    <strong style="margin-left: 4px;">{{ eq.purchase_date }}</strong></div>
             </div>
         </div>
 
-        <!-- Quick Status Control -->
-        <div style="background: rgba(15, 23, 42, 0.8); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); min-width: 240px;">
-            <div style="font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Update Equipment Status</div>
-            <form method="POST" action="{{ url_for('equipment_update_status', equipment_id=eq.equipment_id) }}" style="display: flex; gap: 8px;">
-                <select name="status" class="form-select" style="font-size: 12px; padding: 6px 10px;">
-                    <option value="Available" {% if eq.status == 'Available' %}selected{% endif %}>Available</option>
-                    <option value="In Use" {% if eq.status == 'In Use' %}selected{% endif %}>In Use</option>
-                    <option value="Maintenance" {% if eq.status == 'Maintenance' %}selected{% endif %}>Maintenance</option>
+        {# Status Update Panel #}
+        <div class="card-section" style="min-width: 220px; padding: 14px;">
+            <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">
+                Update Status
+            </div>
+            <form method="POST" action="{{ url_for('equipment_update_status', equipment_id=eq.equipment_id) }}"
+                  style="display: flex; gap: 8px;">
+                <select name="status" class="form-select" style="font-size: 12px;">
+                    <option value="Available"      {% if eq.status == 'Available'      %}selected{% endif %}>Available</option>
+                    <option value="In Use"         {% if eq.status == 'In Use'         %}selected{% endif %}>In Use</option>
+                    <option value="Maintenance"    {% if eq.status == 'Maintenance'    %}selected{% endif %}>Maintenance</option>
                     <option value="Decommissioned" {% if eq.status == 'Decommissioned' %}selected{% endif %}>Decommissioned</option>
                 </select>
                 <button type="submit" class="btn btn-primary btn-sm">Update</button>
             </form>
         </div>
+
     </div>
 </div>
 
-<!-- Chronological History Timeline (Section 10 Requirement) -->
+{# Lifecycle Timeline #}
 <div class="card-section">
     <div class="section-header">
         <div class="section-title">
             <i class="fa-solid fa-timeline" style="color: var(--accent-cyan);"></i>
-            <span>Complete Lifecycle &amp; Historical Usage Timeline</span>
+            <span>Lifecycle &amp; Usage Timeline</span>
         </div>
-        <span style="font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);">{{ timeline|length }} Events Logged</span>
+        <span style="font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);">
+            {{ timeline|length }} Events Logged
+        </span>
     </div>
 
     <div class="timeline">
@@ -86,22 +85,22 @@
                     <i class="fa-solid fa-circle-check" style="font-size: 9px; color: var(--accent-emerald);"></i>
                 {% endif %}
             </div>
-            
+
             <div class="timeline-content">
                 <div class="timeline-header">
                     <div>
-                        <span class="badge badge-{{ event.event_type.lower() }}" style="margin-right: 8px;">{{ event.event_type }}</span>
+                        <span class="badge badge-{{ event.event_type.lower() }}" style="margin-right: 6px;">{{ event.event_type }}</span>
                         <span class="timeline-date">{{ event.event_date }}</span>
                     </div>
                     {% if event.event_status %}
                     <span class="badge badge-{{ event.event_status.lower().replace('_', '-').replace(' ', '-') }}">{{ event.event_status }}</span>
                     {% endif %}
                 </div>
-                
-                <div class="timeline-body" style="font-weight: 500; color: var(--text-primary); margin-bottom: 4px;">
+
+                <div class="timeline-body" style="font-weight: 500; margin-bottom: 4px;">
                     {{ event.details }}
                 </div>
-                
+
                 {% if event.notes %}
                 <div style="font-size: 12px; color: var(--text-muted); font-style: italic;">
                     &ldquo;{{ event.notes }}&rdquo;
@@ -116,4 +115,5 @@
         {% endfor %}
     </div>
 </div>
+
 {% endblock %}

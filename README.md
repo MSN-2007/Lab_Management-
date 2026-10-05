@@ -375,7 +375,7 @@ SQL_PBL/
     ├── login.html              # Authentication & 1-Click Role Login Portal
     ├── dashboard.html          # Executive & Role-Specific Overview
     ├── equipment.html          # Equipment Directory & Filters
-    ├── equipment_detail.html   # Equipment Lifecycle, Breakdown & Service Timeline
+    ├── equipment_detail.html   # Simplified Equipment Detail: Specs Header, Status Update & Lifecycle Timeline
     ├── components.html         # Component Inventory & Low-Stock Alerts
     ├── allocations.html        # Student Loans & Return Quality Verification Modal
     ├── bookings.html           # Time-Slot Reservation & Approval Management
@@ -386,6 +386,15 @@ SQL_PBL/
     ├── reports.html            # Interactive SQL Viva Query Reports Explorer
     └── vendors.html            # Equipment Supplier & Service Partner Directory
 ```
+
+---
+
+## 📝 Changelog
+
+### [Latest] — UI & Workflow Improvements
+* **`equipment_detail.html`** — Simplified and cleaned up the equipment detail page: removed redundant inline `font-family`, `color: var(--text-primary)`, and extra padding styles; replaced the raw `div` status panel with the `.card-section` utility class for consistent styling; condensed the specs metadata row and timeline header markup.
+* **`calibrations.html`** — Calibration schedule table now shows correct color-coded Next Due Date column with per-status accent colors (`Overdue` → rose, `Due Soon` → amber, `OK` → emerald).
+* **`dashboard.html`** — Role-specific portal (Student vs Staff/Admin views) refined: Student portal shows Issued Components, Slot Bookings, Active Projects, and Available Equipment KPIs with matching quick-action shortcuts.
 
 ---
 
