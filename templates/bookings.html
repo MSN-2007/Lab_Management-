@@ -66,7 +66,28 @@
                     <td style="color: var(--text-secondary);">{{ b.project_name or 'Independent Lab Activity' }}</td>
                     <td style="font-family: var(--font-mono); font-size: 12px;">
                         <div>{{ b.booking_date }}</div>
-                        <div style="color: var(--accent-cyan);">{{ b.start_time }} - {{ b.end_time }}</div>
+                        <div style="color: var(--accent-cyan); font-weight: 600;">{{ b.start_time }} - {{ b.end_time }}</div>
+                        {% if b.status == 'PENDING' %}
+                            {% if b.approved_conflict %}
+                                <div style="margin-top: 4px;">
+                                    <span class="badge badge-overdue" style="font-size: 10px; padding: 2px 6px; display: inline-flex; align-items: center; gap: 4px;" title="Slot already allocated to Booking #{{ b.approved_conflict.booking_id }} ({{ b.approved_conflict.student_name }})">
+                                        <i class="fa-solid fa-triangle-exclamation"></i> Overlaps Approved #{{ b.approved_conflict.booking_id }}
+                                    </span>
+                                </div>
+                            {% elif b.competing_requests and b.competing_requests|length > 0 %}
+                                <div style="margin-top: 4px;">
+                                    <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.3); font-size: 10px; padding: 2px 6px; display: inline-flex; align-items: center; gap: 4px;" title="Multiple users requested this slot. Approving one will auto-decline other competing requests.">
+                                        <i class="fa-solid fa-users"></i> {{ b.competing_requests|length }} Competing Request(s)
+                                    </span>
+                                </div>
+                            {% endif %}
+                        {% elif b.status in ['APPROVED', 'IN_USE'] %}
+                            <div style="margin-top: 4px;">
+                                <span class="badge badge-available" style="font-size: 10px; padding: 1px 5px; display: inline-flex; align-items: center; gap: 3px;">
+                                    <i class="fa-solid fa-lock"></i> Exclusive Slot Locked
+                                </span>
+                            </div>
+                        {% endif %}
                     </td>
                     <td style="max-width: 250px; font-size: 12px; color: var(--text-secondary);">
                         {{ b.purpose }}
@@ -77,18 +98,32 @@
                     <td style="text-align: right;">
                         {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
                             {% if b.status == 'PENDING' %}
-                                <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex; gap: 4px;">
-                                    <input type="hidden" name="action" value="APPROVE">
-                                    <button type="submit" class="btn btn-success btn-sm" title="Approve booking reservation">
-                                        <i class="fa-solid fa-check"></i> Approve
-                                    </button>
-                                </form>
-                                <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex; gap: 4px;">
-                                    <input type="hidden" name="action" value="REJECT">
-                                    <button type="submit" class="btn btn-danger btn-sm" title="Reject booking reservation">
-                                        <i class="fa-solid fa-xmark"></i> Reject
-                                    </button>
-                                </form>
+                                {% if b.approved_conflict %}
+                                    <div style="display: inline-flex; gap: 4px; align-items: center;">
+                                        <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; font-size: 11px;" title="Cannot approve: Equipment already approved for {{ b.approved_conflict.student_name }} (#{{ b.approved_conflict.booking_id }})">
+                                            <i class="fa-solid fa-ban"></i> Slot Taken
+                                        </button>
+                                        <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-block;">
+                                            <input type="hidden" name="action" value="REJECT">
+                                            <button type="submit" class="btn btn-danger btn-sm" title="Reject conflicting booking" style="font-size: 11px;">
+                                                <i class="fa-solid fa-xmark"></i> Reject
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex; gap: 4px;">
+                                        <input type="hidden" name="action" value="APPROVE">
+                                        <button type="submit" class="btn btn-success btn-sm" title="{% if b.competing_requests and b.competing_requests|length > 0 %}Approve this user and auto-decline competing requests{% else %}Approve booking reservation{% endif %}">
+                                            <i class="fa-solid fa-check"></i> Approve
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex; gap: 4px;">
+                                        <input type="hidden" name="action" value="REJECT">
+                                        <button type="submit" class="btn btn-danger btn-sm" title="Reject booking reservation">
+                                            <i class="fa-solid fa-xmark"></i> Reject
+                                        </button>
+                                    </form>
+                                {% endif %}
                             {% elif b.status == 'APPROVED' %}
                                 <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex;">
                                     <input type="hidden" name="action" value="START_USE">

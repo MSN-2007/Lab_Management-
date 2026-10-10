@@ -780,6 +780,20 @@ def component_request():
 # ------------------------------------------------------------------------------
 # 4. BOOKINGS & APPROVALS (Equipment Slots)
 # ------------------------------------------------------------------------------
+def normalize_time_str(t_str):
+    if not t_str:
+        return '00:00:00'
+    t_str = str(t_str).strip()
+    parts = t_str.split(':')
+    try:
+        if len(parts) == 2:
+            return f"{int(parts[0]):02d}:{int(parts[1]):02d}:00"
+        elif len(parts) >= 3:
+            return f"{int(parts[0]):02d}:{int(parts[1]):02d}:{int(parts[2]):02d}"
+    except (ValueError, TypeError):
+        pass
+    return t_str
+
 @app.route('/bookings')
 @login_required
 def bookings_list():
@@ -816,6 +830,32 @@ def bookings_list():
         b.booking_date DESC, b.start_time DESC, b.booking_id DESC"""
     
     bookings = query_db(sql, params)
+    
+    # Analyze slot conflicts across bookings to display competition and exclusivity in UI
+    all_active_bookings = query_db("""
+        SELECT b.booking_id, b.equipment_id, b.booking_date, b.start_time, b.end_time, b.status, u.full_name AS student_name
+        FROM BOOKINGS b
+        JOIN USERS u ON b.user_id = u.user_id
+        WHERE b.status IN ('PENDING', 'APPROVED', 'IN_USE')
+    """)
+    for b in bookings:
+        competing = []
+        approved_conflict = None
+        b_start = normalize_time_str(b['start_time'])
+        b_end = normalize_time_str(b['end_time'])
+        for other in all_active_bookings:
+            if other['booking_id'] != b['booking_id'] and other['equipment_id'] == b['equipment_id'] and str(other['booking_date']) == str(b['booking_date']):
+                o_start = normalize_time_str(other['start_time'])
+                o_end = normalize_time_str(other['end_time'])
+                # Overlap condition: other.start < b.end and other.end > b.start
+                if o_start < b_end and o_end > b_start:
+                    if other['status'] in ('APPROVED', 'IN_USE'):
+                        approved_conflict = other
+                    elif other['status'] == 'PENDING':
+                        competing.append(other)
+        b['competing_requests'] = competing
+        b['approved_conflict'] = approved_conflict
+
     equipment = query_db("SELECT equipment_id, equipment_name, status FROM EQUIPMENT ORDER BY equipment_name ASC")
     bookable_users = query_db("""
         SELECT u.user_id, u.full_name, u.roll_number, r.role_name
@@ -840,16 +880,53 @@ def booking_create():
         user_id = request.form.get('user_id') or (user['user_id'] if user else 1)
     proj_id = request.form.get('project_id') or None
     b_date = request.form.get('booking_date')
-    start_t = request.form.get('start_time')
-    end_t = request.form.get('end_time')
+    start_t = normalize_time_str(request.form.get('start_time'))
+    end_t = normalize_time_str(request.form.get('end_time'))
     purpose = request.form.get('purpose', '').strip()
     
+    if end_t <= start_t:
+        flash("Invalid time slot: Slot end time must be after start time.", "danger")
+        return redirect(url_for('bookings_list'))
+        
+    eq = query_db("SELECT equipment_name FROM EQUIPMENT WHERE equipment_id = %s", [eq_id], one=True)
+    eq_name = eq['equipment_name'] if eq else eq_id
+
+    # Check if this slot is already APPROVED or currently IN_USE by another user
+    conflict_approved = query_db("""
+        SELECT b.*, u.full_name
+        FROM BOOKINGS b
+        JOIN USERS u ON b.user_id = u.user_id
+        WHERE b.equipment_id = %s
+          AND b.booking_date = %s
+          AND b.status IN ('APPROVED', 'IN_USE')
+          AND (b.start_time < %s AND b.end_time > %s)
+    """, [eq_id, b_date, end_t, start_t], one=True)
+    
+    if conflict_approved:
+        flash(f"Slot conflict: {eq_name} is already approved and reserved for {conflict_approved['full_name']} on {b_date} ({conflict_approved['start_time']} - {conflict_approved['end_time']}). Only one user can use equipment at a time. Please pick another slot.", 'danger')
+        return redirect(url_for('bookings_list'))
+        
+    # Check if there are other pending requests for this slot
+    pending_conflicts = query_db("""
+        SELECT COUNT(*) AS cnt
+        FROM BOOKINGS
+        WHERE equipment_id = %s
+          AND booking_date = %s
+          AND status = 'PENDING'
+          AND (start_time < %s AND end_time > %s)
+    """, [eq_id, b_date, end_t, start_t], one=True)
+    competing_cnt = pending_conflicts['cnt'] if pending_conflicts else 0
+
     try:
         execute_db("""
             INSERT INTO BOOKINGS (equipment_id, user_id, project_id, booking_date, start_time, end_time, purpose, status)
             VALUES (%s, %s, %s, %s, %s, %s, %s, 'PENDING')
         """, [eq_id, user_id, proj_id, b_date, start_t, end_t, purpose])
-        flash("Equipment booking requested successfully! Awaiting Admin / Technician approval.", 'success')
+        
+        if competing_cnt > 0:
+            flash(f"Booking requested for {eq_name}! Notice: {competing_cnt} other user(s) have also requested an overlapping slot. Admin or Lab Technician will review and approve only one requester.", 'warning')
+        else:
+            flash(f"Equipment booking requested successfully for {eq_name}! Awaiting Admin / Technician approval.", 'success')
     except Exception as e:
         flash(f"Error creating booking: {str(e)}", 'danger')
         
@@ -871,10 +948,58 @@ def booking_update_status(booking_id):
         flash("Booking not found.", 'danger')
         return redirect(url_for('bookings_list'))
         
+    b_start = normalize_time_str(b['start_time'])
+    b_end = normalize_time_str(b['end_time'])
+
     try:
         if action == 'APPROVE':
+            # Mutual Exclusion Check 1: Ensure no overlapping booking is ALREADY approved or in use
+            conflicting_approved = query_db("""
+                SELECT b.*, u.full_name, e.equipment_name
+                FROM BOOKINGS b
+                JOIN USERS u ON b.user_id = u.user_id
+                JOIN EQUIPMENT e ON b.equipment_id = e.equipment_id
+                WHERE b.equipment_id = %s
+                  AND b.booking_date = %s
+                  AND b.booking_id != %s
+                  AND b.status IN ('APPROVED', 'IN_USE')
+                  AND (b.start_time < %s AND b.end_time > %s)
+            """, [b['equipment_id'], b['booking_date'], booking_id, b_end, b_start], one=True)
+            
+            if conflicting_approved:
+                flash(f"Cannot approve Booking #{booking_id}: Equipment '{conflicting_approved['equipment_name']}' is ALREADY approved for {conflicting_approved['full_name']} ({conflicting_approved['start_time']} - {conflicting_approved['end_time']}) under Booking #{conflicting_approved['booking_id']}. Only one user can use this machine at a time.", 'danger')
+                return redirect(url_for('bookings_list'))
+                
+            # Mutual Exclusion Check 2: Find all competing PENDING requests for this slot
+            conflicting_pending = query_db("""
+                SELECT b.booking_id, u.full_name
+                FROM BOOKINGS b
+                JOIN USERS u ON b.user_id = u.user_id
+                WHERE b.equipment_id = %s
+                  AND b.booking_date = %s
+                  AND b.booking_id != %s
+                  AND b.status = 'PENDING'
+                  AND (b.start_time < %s AND b.end_time > %s)
+            """, [b['equipment_id'], b['booking_date'], booking_id, b_end, b_start])
+
+            # Approve this booking
             execute_db("UPDATE BOOKINGS SET status = 'APPROVED', approved_by = %s WHERE booking_id = %s", [approver_id, booking_id])
-            flash(f"Booking #{booking_id} has been APPROVED.", 'success')
+            
+            # Automatically decline competing pending requests for this slot
+            if conflicting_pending:
+                for cp in conflicting_pending:
+                    execute_db("""
+                        UPDATE BOOKINGS 
+                        SET status = 'REJECTED', 
+                            approved_by = %s,
+                            purpose = purpose || %s
+                        WHERE booking_id = %s
+                    """, [approver_id, f" [Auto-declined: Slot allocated to Booking #{booking_id}]", cp['booking_id']])
+                
+                competing_names = ', '.join([f"#{cp['booking_id']} ({cp['full_name']})" for cp in conflicting_pending])
+                flash(f"Booking #{booking_id} APPROVED! Notice: Competing overlapping request(s) [{competing_names}] were automatically declined so only one user can access the equipment.", 'success')
+            else:
+                flash(f"Booking #{booking_id} has been APPROVED.", 'success')
         elif action == 'REJECT':
             execute_db("UPDATE BOOKINGS SET status = 'REJECTED', approved_by = %s WHERE booking_id = %s", [approver_id, booking_id])
             flash(f"Booking #{booking_id} REJECTED.", 'info')
