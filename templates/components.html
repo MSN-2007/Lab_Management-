@@ -39,10 +39,12 @@
             {% endfor %}
         </select>
 
+        {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
         <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); cursor: pointer; padding: 0 10px;">
             <input type="checkbox" name="low_stock" value="1" {% if low_stock == '1' %}checked{% endif %} onchange="this.form.submit()">
             <span>Show Low Stock Only</span>
         </label>
+        {% endif %}
 
         <button type="submit" class="btn btn-secondary">Filter</button>
         {% if search or selected_cat or low_stock %}
@@ -61,7 +63,9 @@
                     <th>Total Stock</th>
                     <th>Available Units</th>
                     <th>Issued Units</th>
+                    {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
                     <th>Min Threshold</th>
+                    {% endif %}
                     <th>Storage Bin</th>
                     {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
                     <th>Unit Cost</th>
@@ -69,6 +73,8 @@
                     <th>Stock Status</th>
                     {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
                     <th style="text-align: right;">Buy / Reorder</th>
+                    {% else %}
+                    <th style="text-align: right;">Request / Tray</th>
                     {% endif %}
                 </tr>
             </thead>
@@ -86,43 +92,147 @@
                     </td>
                     <td>{{ comp.category_name }}</td>
                     <td style="font-weight: 600;">{{ comp.total_quantity }}</td>
-                    <td style="font-weight: 700; font-size: 15px; color: {% if comp.available_quantity <= comp.minimum_stock %}var(--accent-rose){% else %}var(--accent-emerald){% endif %};">
+                    <td style="font-weight: 700; font-size: 15px; color: {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}{% if comp.available_quantity <= comp.minimum_stock %}var(--accent-rose){% else %}var(--accent-emerald){% endif %}{% else %}{% if comp.available_quantity == 0 %}var(--accent-rose){% else %}var(--accent-emerald){% endif %}{% endif %};">
                         {{ comp.available_quantity }}
                     </td>
                     <td style="color: var(--text-secondary);">{{ comp.issued_quantity }}</td>
+                    {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
                     <td style="font-family: var(--font-mono); font-size: 12px;">{{ comp.minimum_stock }}</td>
+                    {% endif %}
                     <td><span class="code-pill" style="color: var(--accent-indigo);">{{ comp.storage_bin or 'N/A' }}</span></td>
                     {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
                     <td style="font-family: var(--font-mono);">₹{{ "%.2f"|format(comp.unit_cost) }}</td>
                     {% endif %}
                     <td>
-                        {% if comp.available_quantity == 0 %}
-                            <span class="badge badge-overdue">Out of Stock</span>
-                        {% elif comp.available_quantity <= comp.minimum_stock %}
-                            <span class="badge badge-maintenance">Low Stock</span>
+                        {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
+                            {% if comp.available_quantity == 0 %}
+                                <span class="badge badge-overdue">Out of Stock</span>
+                            {% elif comp.available_quantity <= comp.minimum_stock %}
+                                <span class="badge badge-maintenance">Low Stock</span>
+                            {% else %}
+                                <span class="badge badge-available">In Stock</span>
+                            {% endif %}
                         {% else %}
-                            <span class="badge badge-available">In Stock</span>
+                            {% if comp.available_quantity == 0 %}
+                                <span class="badge badge-overdue">Out of Stock</span>
+                            {% else %}
+                                <span class="badge badge-available">Available</span>
+                            {% endif %}
                         {% endif %}
                     </td>
-                    {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
                     <td style="text-align: right;">
-                        <form method="POST" action="{{ url_for('procurement_quick_add', component_id=comp.component_id) }}" style="display: inline-block;">
-                            <button type="submit" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px;" title="Create Reorder Request with Store Buy Links">
-                                <i class="fa-solid fa-cart-shopping" style="color: var(--accent-primary);"></i> Reorder
-                            </button>
-                        </form>
+                        {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
+                            <form method="POST" action="{{ url_for('procurement_quick_add', component_id=comp.component_id) }}" style="display: inline-block;">
+                                <button type="submit" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px;" title="Create Reorder Request with Store Buy Links">
+                                    <i class="fa-solid fa-cart-shopping" style="color: var(--accent-primary);"></i> Reorder
+                                </button>
+                            </form>
+                        {% else %}
+                            {% if comp.available_quantity > 0 %}
+                                <button type="button" class="btn btn-primary btn-sm" onclick="addToTray('{{ comp.component_id }}', '{{ comp.component_name|replace('\'', '\\\'') }}', {{ comp.available_quantity }})" style="padding: 3px 10px; font-size: 12px;">
+                                    <i class="fa-solid fa-cart-plus"></i> Request
+                                </button>
+                            {% else %}
+                                <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.5; cursor: not-allowed; padding: 3px 10px; font-size: 12px;">
+                                    <i class="fa-solid fa-ban"></i> Out of Stock
+                                </button>
+                            {% endif %}
+                        {% endif %}
                     </td>
-                    {% endif %}
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="{% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}11{% else %}9{% endif %}" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                    <td colspan="{% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}11{% else %}8{% endif %}" style="text-align: center; color: var(--text-muted); padding: 30px;">
                         No components found.
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- Floating Single-Page Request Tray Bar (Students & Faculty) -->
+<div id="requestTrayBar" style="display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1050; background: var(--bg-card); border: 1px solid var(--accent-primary); box-shadow: 0 10px 30px rgba(0,0,0,0.6); border-radius: 40px; padding: 10px 24px; align-items: center; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="background: rgba(99, 102, 241, 0.2); color: var(--accent-primary); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px;">
+            <i class="fa-solid fa-basket-shopping"></i>
+        </div>
+        <div>
+            <div style="font-weight: 700; font-size: 13px;"><span id="trayItemCount">0</span> Component(s) in Request Tray</div>
+            <div style="font-size: 11px; color: var(--text-secondary);">Submit directly for Admin &amp; Technician approval</div>
+        </div>
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+        <button type="button" class="btn btn-primary btn-sm" onclick="openRequestModal()">
+            <i class="fa-solid fa-list-check"></i> Review &amp; Send Request
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="clearTray()">
+            <i class="fa-solid fa-trash"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Modal: Review & Submit Component Allocation Request -->
+<div id="requestModal" class="modal">
+    <div class="modal-content" style="max-width: 620px;">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fa-solid fa-cart-shopping" style="color: var(--accent-primary); margin-right: 8px;"></i>
+                Component Request Tray
+            </h3>
+            <button class="modal-close" onclick="closeModal('requestModal')">&times;</button>
+        </div>
+        <form id="componentRequestForm" onsubmit="submitComponentRequest(event)">
+            <div class="modal-body">
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Review your requested hardware components. Once sent, Admin or Lab Technicians will review and issue your items.
+                </p>
+
+                <div class="table-container" style="margin-bottom: 16px; max-height: 200px; overflow-y: auto;">
+                    <table class="table-modern" style="font-size: 13px;">
+                        <thead>
+                            <tr>
+                                <th>Component</th>
+                                <th>Available</th>
+                                <th style="width: 130px;">Request Qty</th>
+                                <th style="text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trayItemsTableBody">
+                            <!-- Populated dynamically via JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Associated Project</label>
+                        <select name="project_id" id="requestProjectSelect" class="form-select">
+                            <option value="">Independent Lab / Academic Research</option>
+                            {% for p in projects %}
+                            <option value="{{ p.project_id }}">{{ p.project_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Expected Return Date *</label>
+                        <input type="date" name="expected_return_date" id="requestReturnDate" required class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Subsystem Purpose / Notes</label>
+                    <textarea name="remarks" id="requestRemarks" rows="2" placeholder="e.g. For sensor feedback subsystem testing" class="form-control"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('requestModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="submitRequestBtn">
+                    <i class="fa-solid fa-paper-plane"></i> Send Request for Approval
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -222,4 +332,186 @@
     </div>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+let requestTray = {};
+
+function initRequestTray() {
+    const saved = localStorage.getItem('robolab_request_tray');
+    if (saved) {
+        try { requestTray = JSON.parse(saved); } catch(e) { requestTray = {}; }
+    }
+    updateTrayUI();
+    
+    // Set default expected return date (+14 days)
+    const returnInput = document.getElementById('requestReturnDate');
+    if (returnInput && !returnInput.value) {
+        const d = new Date();
+        d.setDate(d.getDate() + 14);
+        returnInput.value = d.toISOString().split('T')[0];
+    }
+}
+
+function saveTray() {
+    localStorage.setItem('robolab_request_tray', JSON.stringify(requestTray));
+    updateTrayUI();
+}
+
+function addToTray(compId, compName, maxAvail) {
+    if (!requestTray[compId]) {
+        requestTray[compId] = { id: compId, name: compName, max: maxAvail, qty: 1 };
+    } else {
+        if (requestTray[compId].qty < maxAvail) {
+            requestTray[compId].qty += 1;
+        }
+    }
+    saveTray();
+    
+    // Quick notification toast or visual feedback
+    const bar = document.getElementById('requestTrayBar');
+    if (bar) {
+        bar.style.transform = 'translateX(-50%) scale(1.05)';
+        setTimeout(() => { bar.style.transform = 'translateX(-50%) scale(1)'; }, 200);
+    }
+}
+
+function changeTrayQty(compId, delta) {
+    if (!requestTray[compId]) return;
+    const item = requestTray[compId];
+    item.qty += delta;
+    if (item.qty <= 0) {
+        delete requestTray[compId];
+    } else if (item.qty > item.max) {
+        item.qty = item.max;
+    }
+    saveTray();
+    renderTrayTable();
+}
+
+function removeFromTray(compId) {
+    delete requestTray[compId];
+    saveTray();
+    renderTrayTable();
+}
+
+function clearTray() {
+    requestTray = {};
+    saveTray();
+    closeModal('requestModal');
+}
+
+function updateTrayUI() {
+    const count = Object.keys(requestTray).length;
+    const bar = document.getElementById('requestTrayBar');
+    const countEl = document.getElementById('trayItemCount');
+    if (countEl) countEl.innerText = count;
+    if (bar) {
+        bar.style.display = count > 0 ? 'flex' : 'none';
+    }
+}
+
+function renderTrayTable() {
+    const tbody = document.getElementById('trayItemsTableBody');
+    if (!tbody) return;
+    
+    const keys = Object.keys(requestTray);
+    if (keys.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 16px;">Tray is empty. Add components from the stock list above!</td></tr>';
+        const submitBtn = document.getElementById('submitRequestBtn');
+        if (submitBtn) submitBtn.disabled = true;
+        return;
+    }
+    
+    const submitBtn = document.getElementById('submitRequestBtn');
+    if (submitBtn) submitBtn.disabled = false;
+    
+    tbody.innerHTML = keys.map(k => {
+        const item = requestTray[k];
+        return `
+            <tr>
+                <td>
+                    <div style="font-weight: 600;">${item.name}</div>
+                    <span class="code-pill" style="font-size: 10px;">${item.id}</span>
+                </td>
+                <td style="color: var(--accent-emerald); font-weight: 600;">${item.max}</td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 11px;" onclick="changeTrayQty('${item.id}', -1)">-</button>
+                        <span style="font-weight: 700; width: 22px; text-align: center;">${item.qty}</span>
+                        <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 11px;" onclick="changeTrayQty('${item.id}', 1)" ${item.qty >= item.max ? 'disabled' : ''}>+</button>
+                    </div>
+                </td>
+                <td style="text-align: right;">
+                    <button type="button" class="btn btn-secondary btn-sm" style="color: var(--accent-rose); padding: 2px 6px; font-size: 11px;" onclick="removeFromTray('${item.id}')">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function openRequestModal() {
+    renderTrayTable();
+    openModal('requestModal');
+}
+
+async function submitComponentRequest(e) {
+    e.preventDefault();
+    const keys = Object.keys(requestTray);
+    if (keys.length === 0) {
+        alert('Please add at least one component to your request tray.');
+        return;
+    }
+    
+    const items = keys.map(k => ({
+        component_id: requestTray[k].id,
+        quantity: requestTray[k].qty
+    }));
+    
+    const projectId = document.getElementById('requestProjectSelect').value || null;
+    const returnDate = document.getElementById('requestReturnDate').value;
+    const remarks = document.getElementById('requestRemarks').value;
+    
+    const submitBtn = document.getElementById('submitRequestBtn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
+    
+    try {
+        const resp = await fetch('{{ url_for("component_request") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                items: items,
+                project_id: projectId,
+                expected_return_date: returnDate,
+                remarks: remarks
+            })
+        });
+        
+        const result = await resp.json();
+        if (result.success) {
+            requestTray = {};
+            saveTray();
+            closeModal('requestModal');
+            window.location.href = '{{ url_for("allocations_list") }}';
+        } else {
+            alert('Request error: ' + (result.message || 'Unable to submit request.'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Request for Approval';
+        }
+    } catch(err) {
+        alert('Error submitting request: ' + err.message);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Request for Approval';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', initRequestTray);
+</script>
 {% endblock %}

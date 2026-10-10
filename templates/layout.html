@@ -28,7 +28,7 @@
                 <li class="nav-item">
                     <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
                         <i class="fa-solid fa-chart-pie"></i>
-                        <span>{% if current_user and current_user.role_name == 'Student' %}My Student Portal{% else %}Dashboard{% endif %}</span>
+                        <span>{% if current_user and current_user.role_name == 'Student' %}My Student Portal{% elif current_user and current_user.role_name == 'Faculty' %}My Faculty Portal{% else %}Dashboard{% endif %}</span>
                     </a>
                 </li>
                 <li class="nav-item">
@@ -51,7 +51,7 @@
                 <li class="nav-item">
                     <a href="{{ url_for('bookings_list') }}" class="nav-link {% if request.endpoint == 'bookings_list' %}active{% endif %}">
                         <i class="fa-solid fa-calendar-check"></i>
-                        <span>{% if current_user and current_user.role_name == 'Student' %}My Slot Bookings{% else %}Equipment Bookings{% endif %}</span>
+                        <span>{% if current_user and current_user.role_name in ['Student', 'Faculty'] %}My Slot Bookings{% else %}Equipment Bookings{% endif %}</span>
                         {% if pending_bookings_count > 0 and (not current_user or current_user.role_name in ['Admin', 'Lab Technician']) %}
                             <span class="badge badge-pending" style="margin-left: auto; padding: 1px 6px; font-size: 10px;">{{ pending_bookings_count }}</span>
                         {% endif %}
@@ -60,7 +60,7 @@
                 <li class="nav-item">
                     <a href="{{ url_for('allocations_list') }}" class="nav-link {% if request.endpoint == 'allocations_list' %}active{% endif %}">
                         <i class="fa-solid fa-hand-holding-hand"></i>
-                        <span>{% if current_user and current_user.role_name == 'Student' %}My Issued Components{% else %}Project Allocations{% endif %}</span>
+                        <span>{% if current_user and current_user.role_name in ['Student', 'Faculty'] %}My Issued Components{% else %}Project Allocations{% endif %}</span>
                     </a>
                 </li>
                 <li class="nav-item">

@@ -8,17 +8,25 @@
     <div class="section-header">
         <div class="section-title">
             <i class="fa-solid fa-hand-holding-hand" style="color: var(--accent-cyan);"></i>
-            <span>Project Component Allocations (Student &rarr; Project &rarr; Component)</span>
+            <span>{% if current_user and current_user.role_name in ['Student', 'Faculty'] %}My Allocated &amp; Requested Components{% else %}Component Allocations &amp; Request Tracking{% endif %}</span>
         </div>
+        {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
         <button class="btn btn-primary" onclick="openModal('issueComponentModal')">
             <i class="fa-solid fa-plus"></i>
-            <span>Issue Component to Student</span>
+            <span>Manual Issue Component</span>
         </button>
+        {% else %}
+        <a href="{{ url_for('components_list') }}" class="btn btn-primary">
+            <i class="fa-solid fa-cart-plus"></i>
+            <span>Request Components from Stock</span>
+        </a>
+        {% endif %}
     </div>
 
     <!-- Status filter tabs -->
-    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+    <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
         <a href="{{ url_for('allocations_list') }}" class="btn {% if not selected_status %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">All Allocations</a>
+        <a href="{{ url_for('allocations_list', status='Requested') }}" class="btn {% if selected_status == 'Requested' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Pending Requests</a>
         <a href="{{ url_for('allocations_list', status='Issued') }}" class="btn {% if selected_status == 'Issued' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Currently Issued (Active)</a>
         <a href="{{ url_for('allocations_list', status='Returned') }}" class="btn {% if selected_status == 'Returned' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Returned</a>
     </div>
@@ -29,14 +37,14 @@
             <thead>
                 <tr>
                     <th>Alloc ID</th>
-                    <th>Student Borrower</th>
+                    <th>Borrower / User</th>
                     <th>Component Details</th>
                     <th>Project</th>
-                    <th>Qty Issued</th>
+                    <th>Qty</th>
                     <th>Issue Date</th>
                     <th>Due Return Date</th>
                     <th>Status</th>
-                    <th style="text-align: right;">Return Verification</th>
+                    <th style="text-align: right;">Action &amp; Return</th>
                 </tr>
             </thead>
             <tbody>
@@ -45,7 +53,10 @@
                     <td><span class="code-pill">#{{ a.allocation_id }}</span></td>
                     <td>
                         <div style="font-weight: 600;">{{ a.student_name }}</div>
-                        <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">{{ a.roll_number }}</div>
+                        <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+                            <span class="badge" style="padding: 1px 5px; font-size: 10px; background: rgba(99, 102, 241, 0.15); color: var(--accent-primary);">{{ a.user_role or 'User' }}</span>
+                            {% if a.roll_number %}&bull; {{ a.roll_number }}{% endif %}
+                        </div>
                     </td>
                     <td>
                         <div style="font-weight: 600;">{{ a.component_name }}</div>
@@ -61,18 +72,71 @@
                         {{ a.expected_return_date }}
                     </td>
                     <td>
-                        <span class="badge badge-{{ a.status.lower() }}">{{ a.status }}</span>
+                        {% if a.status == 'Requested' %}
+                            <span class="badge badge-pending"><i class="fa-regular fa-clock"></i> Requested</span>
+                        {% elif a.status == 'Issued' %}
+                            <span class="badge badge-issued"><i class="fa-solid fa-hand-holding"></i> Issued</span>
+                        {% elif a.status == 'Returned' %}
+                            <span class="badge badge-available"><i class="fa-solid fa-check"></i> Returned</span>
+                        {% elif a.status == 'Rejected' %}
+                            <span class="badge badge-overdue" style="background: rgba(239, 68, 68, 0.15); color: var(--accent-rose); border: 1px solid rgba(239, 68, 68, 0.3);"><i class="fa-solid fa-xmark"></i> Rejected</span>
+                        {% else %}
+                            <span class="badge badge-{{ a.status.lower() }}">{{ a.status }}</span>
+                        {% endif %}
                     </td>
                     <td style="text-align: right;">
-                        {% if a.status == 'Issued' %}
-                            <button class="btn btn-secondary btn-sm" onclick="openReturnModal('{{ a.allocation_id }}', '{{ a.component_name }}', '{{ a.quantity }}')">
-                                <i class="fa-solid fa-rotate-left"></i>
-                                <span>Process Return</span>
-                            </button>
+                        {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
+                            {# ADMIN & LAB TECHNICIAN ACTIONS #}
+                            {% if a.status == 'Requested' %}
+                                <div style="display: inline-flex; gap: 6px;">
+                                    <form method="POST" action="{{ url_for('allocation_approve', allocation_id=a.allocation_id) }}" style="display: inline-block;">
+                                        <button type="submit" class="btn btn-primary btn-sm" style="padding: 2px 8px; font-size: 11px;" title="Approve request and decrement available stock">
+                                            <i class="fa-solid fa-check"></i> Approve
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('allocation_reject', allocation_id=a.allocation_id) }}" style="display: inline-block;" onsubmit="return confirm('Reject this component request?');">
+                                        <button type="submit" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px; color: var(--accent-rose);" title="Decline request">
+                                            <i class="fa-solid fa-xmark"></i> Reject
+                                        </button>
+                                    </form>
+                                </div>
+                            {% elif a.status == 'Issued' %}
+                                <button class="btn btn-secondary btn-sm" onclick="openReturnModal('{{ a.allocation_id }}', '{{ a.component_name }}', '{{ a.quantity }}')">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                    <span>Process Return</span>
+                                </button>
+                            {% elif a.status == 'Returned' %}
+                                <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+                                    Returned: {{ a.actual_return_date or 'Yes' }}
+                                </div>
+                            {% else %}
+                                <div style="font-size: 11px; color: var(--text-muted);">
+                                    {{ a.remarks or 'Closed' }}
+                                </div>
+                            {% endif %}
                         {% else %}
-                            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
-                                Returned: {{ a.actual_return_date or 'Yes' }}
-                            </div>
+                            {# STUDENT & FACULTY READ-ONLY STATUS #}
+                            {% if a.status == 'Requested' %}
+                                <div style="font-size: 12px; color: var(--accent-amber); display: inline-flex; align-items: center; gap: 4px;">
+                                    <i class="fa-regular fa-clock"></i> Awaiting Lab Review
+                                </div>
+                            {% elif a.status == 'Issued' %}
+                                <div style="font-size: 12px; color: var(--accent-cyan); display: inline-flex; align-items: center; gap: 4px;">
+                                    <i class="fa-solid fa-hand-holding"></i> Currently In Hand
+                                </div>
+                            {% elif a.status == 'Returned' %}
+                                <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+                                    Returned: {{ a.actual_return_date or 'Yes' }}
+                                </div>
+                            {% elif a.status == 'Rejected' %}
+                                <div style="font-size: 11px; color: var(--accent-rose);">
+                                    Request Declined
+                                </div>
+                            {% else %}
+                                <div style="font-size: 11px; color: var(--text-muted);">
+                                    {{ a.status }}
+                                </div>
+                            {% endif %}
                         {% endif %}
                     </td>
                 </tr>
@@ -88,11 +152,12 @@
     </div>
 </div>
 
-<!-- Modal: Issue Component -->
+{% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
+<!-- Modal: Manual Issue Component (Admin / Tech Only) -->
 <div id="issueComponentModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3 class="modal-title">Issue Component to Student Project</h3>
+            <h3 class="modal-title">Issue Component Directly</h3>
             <button class="modal-close" onclick="closeModal('issueComponentModal')">&times;</button>
         </div>
         <form method="POST" action="{{ url_for('allocation_issue') }}">
@@ -108,16 +173,17 @@
 
                 <div class="grid-2">
                     <div class="form-group">
-                        <label class="form-label">Student *</label>
+                        <label class="form-label">Recipient / Borrower *</label>
                         <select name="user_id" required class="form-select">
                             {% for s in students %}
-                            <option value="{{ s.user_id }}">{{ s.full_name }} ({{ s.roll_number }})</option>
+                            <option value="{{ s.user_id }}">{{ s.full_name }} ({{ s.role_name }}{% if s.roll_number %} - {{ s.roll_number }}{% endif %})</option>
                             {% endfor %}
                         </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Project *</label>
-                        <select name="project_id" required class="form-select">
+                        <label class="form-label">Project</label>
+                        <select name="project_id" class="form-select">
+                            <option value="">Independent Lab Activity</option>
                             {% for p in projects %}
                             <option value="{{ p.project_id }}">{{ p.project_name }}</option>
                             {% endfor %}
@@ -132,13 +198,13 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Issue Date *</label>
-                        <input type="date" name="issue_date" required class="form-control">
+                        <input type="date" name="issue_date" required class="form-control" id="issueDateInput">
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Expected Return Date *</label>
-                    <input type="date" name="expected_return_date" required class="form-control">
+                    <input type="date" name="expected_return_date" required class="form-control" id="expectedReturnDateInput">
                 </div>
 
                 <div class="form-group">
@@ -154,7 +220,7 @@
     </div>
 </div>
 
-<!-- Modal: Process Return -->
+<!-- Modal: Process Return (Admin / Tech Only) -->
 <div id="returnComponentModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -171,7 +237,7 @@
                 <div class="grid-2">
                     <div class="form-group">
                         <label class="form-label">Return Date *</label>
-                        <input type="date" name="return_date" required class="form-control">
+                        <input type="date" name="return_date" required class="form-control" id="modalReturnDate">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Returned Quantity *</label>
@@ -201,9 +267,11 @@
         </form>
     </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
+{% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
 <script>
 function openReturnModal(allocId, compName, qty) {
     const form = document.getElementById('returnForm');
@@ -212,7 +280,26 @@ function openReturnModal(allocId, compName, qty) {
     document.getElementById('returnMaxQty').innerText = `Issued Quantity: ${qty} units`;
     document.getElementById('returnedQtyInput').value = qty;
     document.getElementById('returnedQtyInput').max = qty;
+    
+    const d = new Date().toISOString().split('T')[0];
+    const retDate = document.getElementById('modalReturnDate');
+    if (retDate) retDate.value = d;
+    
     openModal('returnComponentModal');
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    const issueDate = document.getElementById('issueDateInput');
+    if (issueDate && !issueDate.value) issueDate.value = today;
+    
+    const returnDate = document.getElementById('expectedReturnDateInput');
+    if (returnDate && !returnDate.value) {
+        const d = new Date();
+        d.setDate(d.getDate() + 14);
+        returnDate.value = d.toISOString().split('T')[0];
+    }
+});
 </script>
+{% endif %}
 {% endblock %}

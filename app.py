@@ -402,16 +402,16 @@ def dashboard():
     active_allocations = query_db("SELECT COUNT(*) AS cnt FROM EQUIPMENT_ALLOCATION WHERE status = 'Issued'", one=True)['cnt']
     active_projects = query_db("SELECT COUNT(*) AS cnt FROM PROJECTS WHERE status = 'Active'", one=True)['cnt']
     
-    # Student-Specific Data
+    # Personal Activity Data for Student & Faculty
     my_allocations = []
     my_bookings = []
     my_projects = []
-    if role == 'Student':
+    if role in ['Student', 'Faculty']:
         my_allocations = query_db("""
-            SELECT ea.*, c.component_name, c.storage_bin, p.project_name
+            SELECT ea.*, c.component_name, c.storage_bin, COALESCE(p.project_name, 'Independent Lab Activity') AS project_name
             FROM EQUIPMENT_ALLOCATION ea
             JOIN COMPONENTS c ON ea.component_id = c.component_id
-            JOIN PROJECTS p ON ea.project_id = p.project_id
+            LEFT JOIN PROJECTS p ON ea.project_id = p.project_id
             WHERE ea.user_id = %s
             ORDER BY ea.allocation_id DESC
         """, [user_id])
@@ -425,13 +425,23 @@ def dashboard():
             ORDER BY b.booking_id DESC
         """, [user_id])
         
-        my_projects = query_db("""
-            SELECT p.*, pm.role_in_project, u.full_name AS guide_name
-            FROM PROJECTS p
-            JOIN PROJECT_MEMBERS pm ON p.project_id = pm.project_id
-            LEFT JOIN USERS u ON p.guide_faculty_id = u.user_id
-            WHERE pm.user_id = %s
-        """, [user_id])
+        if role == 'Faculty':
+            my_projects = query_db("""
+                SELECT p.*, 'Faculty Guide' AS role_in_project, u.full_name AS guide_name
+                FROM PROJECTS p
+                LEFT JOIN USERS u ON p.guide_faculty_id = u.user_id
+                WHERE p.guide_faculty_id = %s
+                ORDER BY p.project_id DESC
+            """, [user_id])
+        else:
+            my_projects = query_db("""
+                SELECT p.*, pm.role_in_project, u.full_name AS guide_name
+                FROM PROJECTS p
+                JOIN PROJECT_MEMBERS pm ON p.project_id = pm.project_id
+                LEFT JOIN USERS u ON p.guide_faculty_id = u.user_id
+                WHERE pm.user_id = %s
+                ORDER BY p.project_id DESC
+            """, [user_id])
 
     # Recent Activity Feed for Staff / Admin / Tech / Faculty
     recent_allocations = query_db("""
@@ -654,8 +664,9 @@ def components_list():
     
     components = query_db(sql, params)
     categories = query_db("SELECT * FROM COMPONENT_CATEGORIES ORDER BY category_name ASC")
+    projects = query_db("SELECT project_id, project_name FROM PROJECTS WHERE status = 'Active' ORDER BY project_name ASC")
     
-    return render_template('components.html', components=components, categories=categories,
+    return render_template('components.html', components=components, categories=categories, projects=projects,
                            selected_cat=cat_filter, low_stock=low_stock_only, search=search)
 
 @app.route('/components/add', methods=['POST'])
@@ -711,6 +722,60 @@ def component_restock():
         flash(f"Restock error: {str(e)}", 'danger')
         
     return redirect(url_for('components_list'))
+
+@app.route('/components/request', methods=['POST'])
+@login_required
+def component_request():
+    user = get_current_user()
+    user_id = user['user_id'] if user else 1
+
+    data = request.get_json(silent=True)
+    if data:
+        items = data.get('items', [])
+        proj_id = data.get('project_id') or None
+        exp_return = data.get('expected_return_date')
+        remarks = data.get('remarks', '').strip()
+    else:
+        c_id = request.form.get('component_id')
+        qty = int(request.form.get('quantity', 1))
+        items = [{'component_id': c_id, 'quantity': qty}] if c_id else []
+        proj_id = request.form.get('project_id') or None
+        exp_return = request.form.get('expected_return_date')
+        remarks = request.form.get('remarks', '').strip()
+
+    if not items:
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'No components selected.'}), 400
+        flash("No components selected for request.", 'warning')
+        return redirect(url_for('components_list'))
+
+    import datetime
+    today_str = datetime.date.today().isoformat()
+    if not exp_return:
+        exp_return = (datetime.date.today() + datetime.timedelta(days=14)).isoformat()
+
+    success_count = 0
+    for item in items:
+        c_id = item.get('component_id')
+        qty = int(item.get('quantity', 1))
+        if not c_id or qty <= 0:
+            continue
+
+        comp = query_db("SELECT component_name, available_quantity FROM COMPONENTS WHERE component_id = %s", [c_id], one=True)
+        if not comp:
+            continue
+
+        execute_db("""
+            INSERT INTO EQUIPMENT_ALLOCATION (component_id, user_id, project_id, quantity, issue_date, expected_return_date, status, remarks)
+            VALUES (%s, %s, %s, %s, %s, %s, 'Requested', %s)
+        """, [c_id, user_id, proj_id, qty, today_str, exp_return, remarks or f"Requested {qty}x {comp['component_name']}"])
+        success_count += 1
+
+    if request.is_json:
+        return jsonify({'success': True, 'count': success_count, 'message': f'Requested {success_count} component(s) successfully!'})
+
+    flash(f"Submitted component request for {success_count} item(s)! Awaiting Admin / Technician approval.", 'success')
+    return redirect(url_for('allocations_list'))
 
 # ------------------------------------------------------------------------------
 # 4. BOOKINGS & APPROVALS (Equipment Slots)
@@ -841,38 +906,58 @@ def allocations_list():
     
     sql = """
         SELECT ea.*, c.component_name, c.storage_bin, u.full_name AS student_name, u.roll_number,
-               p.project_name
+               COALESCE(p.project_name, 'Independent Lab Activity') AS project_name,
+               r.role_name AS user_role
         FROM EQUIPMENT_ALLOCATION ea
         JOIN COMPONENTS c ON ea.component_id = c.component_id
         JOIN USERS u ON ea.user_id = u.user_id
-        JOIN PROJECTS p ON ea.project_id = p.project_id
+        JOIN ROLES r ON u.role_id = r.role_id
+        LEFT JOIN PROJECTS p ON ea.project_id = p.project_id
         WHERE 1=1
     """
     params = []
     if user and user['role_name'] == 'Student':
         sql += " AND ea.user_id = %s"
         params.append(user['user_id'])
+    elif user and user['role_name'] == 'Faculty':
+        sql += " AND (ea.user_id = %s OR p.guide_faculty_id = %s)"
+        params.append(user['user_id'])
+        params.append(user['user_id'])
 
     if status_filter:
         sql += " AND ea.status = %s"
         params.append(status_filter)
         
-    sql += " ORDER BY ea.allocation_id DESC"
+    sql += """ ORDER BY 
+        CASE WHEN ea.status = 'Requested' THEN 1 WHEN ea.status = 'Issued' THEN 2 ELSE 3 END ASC,
+        CASE WHEN r.role_name = 'Faculty' THEN 1 WHEN r.role_name = 'Student' THEN 2 ELSE 3 END ASC,
+        ea.allocation_id DESC"""
     
     allocations = query_db(sql, params)
     components = query_db("SELECT component_id, component_name, available_quantity FROM COMPONENTS WHERE available_quantity > 0 ORDER BY component_name ASC")
-    students = query_db("SELECT user_id, full_name, roll_number FROM USERS WHERE role_id = 4 ORDER BY full_name ASC")
+    recipients = query_db("""
+        SELECT u.user_id, u.full_name, u.roll_number, r.role_name
+        FROM USERS u
+        JOIN ROLES r ON u.role_id = r.role_id
+        WHERE r.role_name IN ('Faculty', 'Student')
+        ORDER BY CASE r.role_name WHEN 'Faculty' THEN 1 ELSE 2 END, u.full_name ASC
+    """)
     projects = query_db("SELECT project_id, project_name FROM PROJECTS WHERE status = 'Active' ORDER BY project_name ASC")
     
     return render_template('allocations.html', allocations=allocations, components=components,
-                           students=students, projects=projects, selected_status=status_filter)
+                           students=recipients, recipients=recipients, projects=projects, selected_status=status_filter)
 
 @app.route('/allocations/issue', methods=['POST'])
 @login_required
 def allocation_issue():
+    user = get_current_user()
+    if user and user['role_name'] not in ['Admin', 'Lab Technician']:
+        flash("Unauthorized. Only Admin and Lab Technicians have authority to issue components.", 'danger')
+        return redirect(url_for('allocations_list'))
+
     c_id = request.form.get('component_id')
     user_id = request.form.get('user_id')
-    proj_id = request.form.get('project_id')
+    proj_id = request.form.get('project_id') or None
     qty = int(request.form.get('quantity', 1))
     issue_date = request.form.get('issue_date')
     exp_return = request.form.get('expected_return_date')
@@ -896,10 +981,68 @@ def allocation_issue():
         
     return redirect(url_for('allocations_list'))
 
+@app.route('/allocations/<int:allocation_id>/approve', methods=['POST'])
+@login_required
+def allocation_approve(allocation_id):
+    user = get_current_user()
+    if user and user['role_name'] not in ['Admin', 'Lab Technician']:
+        flash("Unauthorized. Only Admin and Lab Technicians can approve component requests.", 'danger')
+        return redirect(url_for('allocations_list'))
+        
+    alloc = query_db("SELECT * FROM EQUIPMENT_ALLOCATION WHERE allocation_id = %s", [allocation_id], one=True)
+    if not alloc:
+        flash("Allocation record not found.", 'danger')
+        return redirect(url_for('allocations_list'))
+        
+    comp = query_db("SELECT available_quantity, component_name FROM COMPONENTS WHERE component_id = %s", [alloc['component_id']], one=True)
+    if not comp or comp['available_quantity'] < alloc['quantity']:
+        flash(f"Cannot approve: Insufficient stock for {comp['component_name'] if comp else 'component'}! Available: {comp['available_quantity'] if comp else 0}, Requested: {alloc['quantity']}", 'danger')
+        return redirect(url_for('allocations_list'))
+        
+    import datetime
+    today_str = datetime.date.today().isoformat()
+    try:
+        execute_db("""
+            UPDATE EQUIPMENT_ALLOCATION
+            SET status = 'Issued', issue_date = %s
+            WHERE allocation_id = %s
+        """, [today_str, allocation_id])
+        execute_db("UPDATE COMPONENTS SET available_quantity = available_quantity - %s WHERE component_id = %s", [alloc['quantity'], alloc['component_id']])
+        flash(f"Request #{allocation_id} APPROVED and {alloc['quantity']}x {comp['component_name']} issued successfully!", 'success')
+    except Exception as e:
+        flash(f"Error approving request: {str(e)}", 'danger')
+        
+    return redirect(url_for('allocations_list'))
+
+@app.route('/allocations/<int:allocation_id>/reject', methods=['POST'])
+@login_required
+def allocation_reject(allocation_id):
+    user = get_current_user()
+    if user and user['role_name'] not in ['Admin', 'Lab Technician']:
+        flash("Unauthorized. Only Admin and Lab Technicians can reject component requests.", 'danger')
+        return redirect(url_for('allocations_list'))
+        
+    reason = request.form.get('reason', 'Request declined by lab staff.').strip()
+    try:
+        execute_db("""
+            UPDATE EQUIPMENT_ALLOCATION
+            SET status = 'Rejected', remarks = remarks || %s
+            WHERE allocation_id = %s
+        """, [f" [Rejected: {reason}]", allocation_id])
+        flash(f"Request #{allocation_id} REJECTED.", 'info')
+    except Exception as e:
+        flash(f"Error rejecting request: {str(e)}", 'danger')
+        
+    return redirect(url_for('allocations_list'))
+
 @app.route('/allocations/<int:allocation_id>/return', methods=['POST'])
 @login_required
 def allocation_return(allocation_id):
     user = get_current_user()
+    if user and user['role_name'] not in ['Admin', 'Lab Technician']:
+        flash("Unauthorized. Only Admin and Lab Technicians can process returns.", 'danger')
+        return redirect(url_for('allocations_list'))
+
     ret_date = request.form.get('return_date')
     ret_qty = int(request.form.get('returned_quantity', 1))
     condition = request.form.get('condition_status', 'Good')

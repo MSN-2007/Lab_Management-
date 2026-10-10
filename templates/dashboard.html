@@ -4,6 +4,8 @@
 {% block page_title %}
     {% if role == 'Student' %}
         Student Portal &mdash; Welcome, {{ current_user.full_name }}
+    {% elif role == 'Faculty' %}
+        Faculty Portal &mdash; Welcome, {{ current_user.full_name }}
     {% else %}
         Laboratory Dashboard ({{ role }} View)
     {% endif %}
@@ -47,9 +49,9 @@
 </div>
 {% endif %}
 
-{% if role == 'Student' %}
+{% if role in ['Student', 'Faculty'] %}
 <!-- ==============================================================================
-     STUDENT PERSONAL PORTAL VIEW
+     STUDENT & FACULTY PERSONAL PORTAL VIEW
      ============================================================================== -->
 <div class="metrics-grid">
     <div class="metric-card" style="--card-accent: var(--accent-cyan);">
@@ -58,7 +60,7 @@
             <div class="metric-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
         </div>
         <div class="metric-value">{{ my_allocations|length }}</div>
-        <div class="metric-subtitle">Active borrowed items</div>
+        <div class="metric-subtitle">Active &amp; requested items</div>
     </div>
 
     <div class="metric-card" style="--card-accent: var(--accent-indigo);">
@@ -72,11 +74,11 @@
 
     <div class="metric-card" style="--card-accent: var(--accent-emerald);">
         <div class="metric-header">
-            <span class="metric-title">Active Projects</span>
+            <span class="metric-title">{% if role == 'Faculty' %}Supervised Projects{% else %}Active Projects{% endif %}</span>
             <div class="metric-icon"><i class="fa-solid fa-diagram-project"></i></div>
         </div>
         <div class="metric-value">{{ my_projects|length }}</div>
-        <div class="metric-subtitle">Registered teams</div>
+        <div class="metric-subtitle">{% if role == 'Faculty' %}Mentored research teams{% else %}Registered teams{% endif %}</div>
     </div>
 
     <div class="metric-card" style="--card-accent: var(--accent-purple);">
@@ -188,12 +190,12 @@
     </div>
 
     <div>
-        <!-- My Projects Summary -->
+        <!-- My Projects / Supervised Projects Summary -->
         <div class="card-section">
             <div class="section-header">
                 <div class="section-title">
                     <i class="fa-solid fa-diagram-project" style="color: var(--accent-emerald);"></i>
-                    <span>My Projects</span>
+                    <span>{% if role == 'Faculty' %}Supervised Projects{% else %}My Projects{% endif %}</span>
                 </div>
             </div>
 
@@ -205,7 +207,11 @@
                         <span class="badge badge-{{ p.status.lower() }}">{{ p.status }}</span>
                     </div>
                     <div style="font-size: 12px; color: var(--accent-blue); margin-bottom: 2px;">Role: {{ p.role_in_project }}</div>
+                    {% if role != 'Faculty' %}
                     <div style="font-size: 11px; color: var(--text-muted);">Guide: {{ p.guide_name or 'Faculty Mentor' }}</div>
+                    {% else %}
+                    <div style="font-size: 11px; color: var(--text-muted);">{{ p.description or 'Active lab research project' }}</div>
+                    {% endif %}
                 </div>
                 {% else %}
                 <div style="color: var(--text-muted); font-size: 13px;">No projects registered.</div>
@@ -236,7 +242,7 @@
 
 {% else %}
 <!-- ==============================================================================
-     STAFF / ADMIN / TECHNICIAN / FACULTY VIEW
+     STAFF / ADMIN / TECHNICIAN VIEW
      ============================================================================== -->
 <!-- KPI Overview Cards -->
 <div class="metrics-grid">
