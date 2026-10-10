@@ -36,27 +36,26 @@ Track all lab machines (robotic arms, 3D printers, CNC routers, oscilloscopes, e
 - Serial number, purchase date, category
 - A **timeline view** showing its entire history — every booking, breakdown, and service job logged chronologically
 
-### Component Inventory
-Manage smaller hardware items (sensors, microcontrollers, motors, etc.) stored in physical bins. The system tracks:
+### Component Inventory & Single-Page Request Tray
+Manage smaller hardware items (sensors, microcontrollers, motors, etc.) stored in physical bins:
 - Total quantity vs available quantity vs minimum safety threshold
-- Low-stock warnings when stock falls below the minimum
-- Bin and rack location for physical retrieval
+- Role-based privacy: unit costs, procurement links, and restock controls are restricted to Admin & Lab Technicians
+- **Single-Page Request Tray / Cart**: Students and Faculty can add multiple hardware components directly into a floating cart tray, select an associated project, specify expected return dates, and submit batch requests without navigating between pages
+- Low-stock warnings are displayed exclusively on staff/admin management views
 
-### Component Allocation (Issuing & Returns)
-Students borrow components for their projects. The system:
-1. Issues components to a student, linked to their project
-2. Sets a due date for return
-3. Flags overdue items
-4. On return, checks the condition (`Good`, `Damaged`, `Burnt`, `Lost`)
-5. Automatically updates available stock via a SQL trigger — only restores usable items
+### Component Allocation & Return Verification
+Track hardware loans from lab storage through project completion:
+1. Students and Faculty submit requests via the component tray (`Requested` status)
+2. Admin or Lab Technician reviews and approves requests — automatically deducting available inventory and marking status as `Issued`
+3. Return inspections and stock restoration are strictly restricted to Admin and Lab Technicians, who log item conditions (`Good`, `Damaged`, `Burnt`, `Lost`)
+4. Students and Faculty have read-only visibility into their allocation records (*Awaiting Lab Review*, *Currently In Hand*, *Returned*)
 
-### Equipment Bookings
-Students book time slots for shared machines. The booking goes through stages:
-```
-Pending → Approved → In Use → Returned
-                  ↘ Cancelled
-```
-Faculty and Admin approve/reject pending bookings.
+### Equipment Bookings & Slot Mutual Exclusion
+Shared machines (CNC, 3D printers, robotic arms) operate under strict single-user time slot exclusivity:
+- **Strict Single-User Exclusivity**: Only one user can have an approved reservation for any machine during an overlapping time window
+- **Automated Conflict Resolution**: If multiple users request overlapping slots for the same machine, staff see visual conflict alerts (`⚠️ Competing Request(s)`). Approving one requester automatically declines competing overlapping requests with an audit explanation
+- **Pre-Booking Conflict Prevention**: System prevents double-booking attempts if a slot is already approved and locked
+- **Faculty Priority**: Booking queues prioritize Faculty requests at the top above Student requests
 
 ### Maintenance & Breakdowns
 When equipment breaks:
@@ -100,16 +99,16 @@ The sidebar has a toggle:
 
 ## Who Uses It (Roles)
 
-There are four roles with different levels of access:
+There are four roles with distinct, secure levels of access:
 
-| Role | What they can do |
-|---|---|
-| **Admin** | Full access — manage users, approve procurement, view all reports, load/reset demo data |
-| **Lab Technician** | Issue and return components, log breakdowns, manage maintenance jobs and calibration records |
-| **Faculty** | Approve or reject equipment bookings, oversee student projects, review allocation history |
-| **Student** | Book equipment slots, view their issued components, track their project assignments |
+| Role | Portal / View | What they can do |
+|---|---|---|
+| **Admin** | Global Lab Dashboard | Complete system authority: manage user accounts (`/users`), approve procurement, oversee inventory, configure settings, load/reset demo databases |
+| **Lab Technician** | Staff Lab Operations | Daily lab management: approve component requests, manually issue hardware, process &amp; verify returns, approve/manage equipment bookings, log breakdowns, service jobs &amp; calibrations |
+| **Faculty** | Faculty Portal | Personalized academic dashboard: view currently borrowed components, reserve equipment slots (prioritized in approval queues), supervise research projects, request components via cart tray |
+| **Student** | Student Portal | Personalized student workspace: view issued items &amp; due dates, request components directly via the in-page request tray, reserve equipment slots, view assigned team projects |
 
-> **Testing tip:** Use the role switcher dropdown in the top navigation bar to instantly switch between accounts without logging out.
+> **Testing tip:** Use the quick 1-click persona buttons on the Login page (`/login`) to easily test workflows as Admin, Technician, Faculty, or Student.
 
 ---
 
@@ -376,12 +375,16 @@ SQL_PBL/
 
 ## Changelog
 
-**October 2026**
-- Full UI overhaul — replaced the rainbow accent color scheme with a clean monochrome slate theme
-- Simplified `equipment_detail.html` — removed excessive inline styles, cleaner header and timeline layout
-- `calibrations.html` — next due date now color-coded by status (Overdue / Due Soon / OK)
-- `dashboard.html` — cleaner separation between Student portal and Staff/Admin dashboard views
-- README rewritten for clarity
+**October 2026 — RBAC & Workflow Upgrades**
+- **Single-Page Component Request Tray**: Added floating cart tray and review modal in `components.html` allowing Students and Faculty to request components directly without hopping across pages.
+- **Equipment Slot Mutual Exclusion & Conflict Resolution**: Enforced strict single-user machine access; system detects overlapping booking requests, displays conflict indicators (`⚠️ Competing Request(s)`), and automatically declines competing requests upon approval of a slot.
+- **Dedicated Faculty Portal**: Upgraded `dashboard.html` with an exclusive Faculty view featuring personal issued components, slot reservations, and supervised projects, removing staff-only low-stock alert widgets.
+- **Strict Role-Based Access Control (RBAC)**:
+  - User accounts administration restricted strictly to Admin (`/users`).
+  - Component pricing, procurement orders, and restock actions restricted to Admin and Lab Technician.
+  - Component return processing and manual issuance restricted to Admin and Lab Technician.
+  - Equipment booking approvals restricted to Admin and Lab Technician, with Faculty requests prioritized at the top of the queue.
+- **Full UI Overhaul**: Upgraded system styling to modern dark monochrome aesthetic, offline FontAwesome icons, responsive layout, and clean role-aware navigation.
 
 ---
 
