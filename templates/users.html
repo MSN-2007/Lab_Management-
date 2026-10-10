@@ -88,10 +88,6 @@
                     </td>
                     <td style="text-align: right;">
                         <div style="display: flex; gap: 6px; justify-content: flex-end;">
-                            <a href="{{ url_for('switch_role', user_id=u.user_id) }}" class="btn btn-secondary btn-sm" title="Log in as this persona">
-                                <i class="fa-solid fa-arrow-right-to-bracket"></i>
-                                <span>Switch</span>
-                            </a>
                             <button class="btn btn-secondary btn-sm" onclick="openEditUserModal('{{ u.user_id }}', '{{ u.full_name }}', '{{ u.email }}', '{{ u.role_id }}', '{{ u.roll_number or '' }}', '{{ u.department }}', '{{ u.phone or '' }}')" title="Edit Account">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </button>
