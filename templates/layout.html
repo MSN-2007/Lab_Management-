@@ -69,12 +69,14 @@
                         <span>Robotics Projects</span>
                     </a>
                 </li>
+                {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
                 <li class="nav-item">
                     <a href="{{ url_for('procurement_list') }}" class="nav-link {% if request.endpoint == 'procurement_list' %}active{% endif %}">
                         <i class="fa-solid fa-basket-shopping"></i>
                         <span>Procurement &amp; Orders</span>
                     </a>
                 </li>
+                {% endif %}
 
                 <li class="nav-section-title">Administration</li>
                 <li class="nav-item">

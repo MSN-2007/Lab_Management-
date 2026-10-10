@@ -535,9 +535,15 @@ def equipment_detail(equipment_id):
         WHERE brk.equipment_id = %s
     """, [equipment_id])
     
-    maintenance = query_db("""
+    user = get_current_user()
+    if user and user['role_name'] in ['Admin', 'Lab Technician']:
+        maint_cost_expr = "CONCAT('Vendor: ', COALESCE(v.vendor_name, 'In-House'), ' | Cost: Rs.', m.cost)"
+    else:
+        maint_cost_expr = "CONCAT('Vendor: ', COALESCE(v.vendor_name, 'In-House'))"
+
+    maintenance = query_db(f"""
         SELECT m.start_date AS event_date, 'Maintenance' AS event_type, m.status AS event_status,
-               CONCAT('Vendor: ', COALESCE(v.vendor_name, 'In-House'), ' | Cost: Rs.', m.cost) AS details,
+               {maint_cost_expr} AS details,
                CONCAT('Action: ', COALESCE(m.action_taken, m.problem_description)) AS notes
         FROM MAINTENANCE_JOBS m
         LEFT JOIN VENDORS v ON m.vendor_id = v.vendor_id
@@ -635,6 +641,11 @@ def components_list():
 @app.route('/components/add', methods=['POST'])
 @login_required
 def component_add():
+    user = get_current_user()
+    if user and user['role_name'] not in ['Admin', 'Lab Technician']:
+        flash("Unauthorized. Only Admin and Lab Technicians can add new components.", 'danger')
+        return redirect(url_for('components_list'))
+
     c_id = request.form.get('component_id', '').strip()
     name = request.form.get('component_name', '').strip()
     cat_id = request.form.get('category_id')
@@ -658,6 +669,11 @@ def component_add():
 @app.route('/components/restock', methods=['POST'])
 @login_required
 def component_restock():
+    user = get_current_user()
+    if user and user['role_name'] not in ['Admin', 'Lab Technician']:
+        flash("Unauthorized. Only Admin and Lab Technicians can restock components.", 'danger')
+        return redirect(url_for('components_list'))
+
     c_id = request.form.get('component_id')
     add_qty = int(request.form.get('additional_quantity', 0))
     if add_qty <= 0:
@@ -1238,6 +1254,11 @@ def reports_view():
 @app.route('/procurement')
 @login_required
 def procurement_list():
+    user = get_current_user()
+    if user and user['role_name'] not in ['Admin', 'Lab Technician']:
+        flash("Access restricted. Procurement & Orders is only available to Admin and Lab Technicians.", 'danger')
+        return redirect(url_for('dashboard'))
+
     status_filter = request.args.get('status', '')
     priority_filter = request.args.get('priority', '')
     search = request.args.get('q', '').strip()
@@ -1289,6 +1310,10 @@ def procurement_list():
 @login_required
 def procurement_add():
     user = get_current_user()
+    if user and user['role_name'] not in ['Admin', 'Lab Technician']:
+        flash("Unauthorized. Only Admin and Lab Technicians can create procurement orders.", 'danger')
+        return redirect(url_for('dashboard'))
+
     comp_id = request.form.get('component_id', '').strip() or None
     item_name = request.form.get('item_name', '').strip()
     category_name = request.form.get('category_name', 'Microcontrollers & Sensors').strip()
@@ -1324,6 +1349,10 @@ def procurement_add():
 @login_required
 def procurement_quick_add(component_id):
     user = get_current_user()
+    if user and user['role_name'] not in ['Admin', 'Lab Technician']:
+        flash("Unauthorized. Only Admin and Lab Technicians can create reorder requests.", 'danger')
+        return redirect(url_for('components_list'))
+
     comp = query_db("SELECT * FROM COMPONENTS WHERE component_id = %s", [component_id], one=True)
     if not comp:
         flash("Component not found.", 'danger')
@@ -1352,6 +1381,11 @@ def procurement_quick_add(component_id):
 @app.route('/procurement/status/<int:requisition_id>', methods=['POST'])
 @login_required
 def procurement_update_status(requisition_id):
+    user = get_current_user()
+    if user and user['role_name'] not in ['Admin', 'Lab Technician']:
+        flash("Unauthorized.", 'danger')
+        return redirect(url_for('dashboard'))
+
     new_status = request.form.get('status')
     r = query_db("SELECT * FROM REQUISITIONS WHERE requisition_id = %s", [requisition_id], one=True)
     if not r:
@@ -1379,6 +1413,11 @@ def procurement_update_status(requisition_id):
 @app.route('/procurement/delete/<int:requisition_id>', methods=['POST'])
 @login_required
 def procurement_delete(requisition_id):
+    user = get_current_user()
+    if user and user['role_name'] not in ['Admin', 'Lab Technician']:
+        flash("Unauthorized.", 'danger')
+        return redirect(url_for('dashboard'))
+
     try:
         execute_db("DELETE FROM REQUISITIONS WHERE requisition_id = %s", [requisition_id])
         flash(f"Order item #{requisition_id} deleted.", 'info')

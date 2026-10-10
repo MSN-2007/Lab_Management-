@@ -10,6 +10,7 @@
             <i class="fa-solid fa-boxes-stacked" style="color: var(--accent-cyan);"></i>
             <span>Component Stock &amp; Real-time Quantities</span>
         </div>
+        {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
         <div style="display: flex; gap: 10px;">
             <a href="{{ url_for('procurement_list') }}" class="btn btn-secondary">
                 <i class="fa-solid fa-basket-shopping"></i>
@@ -24,6 +25,7 @@
                 <span>Add New Component</span>
             </button>
         </div>
+        {% endif %}
     </div>
 
     <!-- Search & Filter Controls -->
@@ -61,9 +63,13 @@
                     <th>Issued Units</th>
                     <th>Min Threshold</th>
                     <th>Storage Bin</th>
+                    {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
                     <th>Unit Cost</th>
+                    {% endif %}
                     <th>Stock Status</th>
+                    {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
                     <th style="text-align: right;">Buy / Reorder</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -86,7 +92,9 @@
                     <td style="color: var(--text-secondary);">{{ comp.issued_quantity }}</td>
                     <td style="font-family: var(--font-mono); font-size: 12px;">{{ comp.minimum_stock }}</td>
                     <td><span class="code-pill" style="color: var(--accent-indigo);">{{ comp.storage_bin or 'N/A' }}</span></td>
+                    {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
                     <td style="font-family: var(--font-mono);">₹{{ "%.2f"|format(comp.unit_cost) }}</td>
+                    {% endif %}
                     <td>
                         {% if comp.available_quantity == 0 %}
                             <span class="badge badge-overdue">Out of Stock</span>
@@ -96,6 +104,7 @@
                             <span class="badge badge-available">In Stock</span>
                         {% endif %}
                     </td>
+                    {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
                     <td style="text-align: right;">
                         <form method="POST" action="{{ url_for('procurement_quick_add', component_id=comp.component_id) }}" style="display: inline-block;">
                             <button type="submit" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px;" title="Create Reorder Request with Store Buy Links">
@@ -103,10 +112,11 @@
                             </button>
                         </form>
                     </td>
+                    {% endif %}
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                    <td colspan="{% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}11{% else %}9{% endif %}" style="text-align: center; color: var(--text-muted); padding: 30px;">
                         No components found.
                     </td>
                 </tr>
@@ -116,6 +126,7 @@
     </div>
 </div>
 
+{% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
 <!-- Modal: Add New Component -->
 <div id="addComponentModal" class="modal">
     <div class="modal-content">
@@ -210,4 +221,5 @@
         </form>
     </div>
 </div>
+{% endif %}
 {% endblock %}

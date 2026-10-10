@@ -21,6 +21,7 @@
             <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 10px;">
                 You are currently in <strong>Clean Slate Mode</strong>. Register your own laboratory machinery, hardware components, and assign user accounts. To test with rich mock data instead, click <em>Load Live Demo Showcase Data</em>.
             </p>
+            {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                 <a href="{{ url_for('equipment_list') }}" class="btn btn-primary btn-sm">
                     <i class="fa-solid fa-plus"></i> Add Equipment
@@ -32,6 +33,7 @@
                     <i class="fa-solid fa-user-plus"></i> Assign Accounts
                 </a>
             </div>
+            {% endif %}
         </div>
         <div>
             <a href="{{ url_for('db_load_demo') }}" class="btn btn-secondary" style="border: 1px solid var(--accent-emerald); color: var(--accent-emerald);">
@@ -382,7 +384,9 @@
                     <i class="fa-solid fa-triangle-exclamation" style="color: var(--accent-rose);"></i>
                     <span>Low Stock Alerts</span>
                 </div>
+                {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
                 <a href="{{ url_for('components_list') }}?low_stock=1" class="btn btn-secondary btn-sm">Restock</a>
+                {% endif %}
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 10px;">
