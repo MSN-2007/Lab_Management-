@@ -723,17 +723,19 @@ def bookings_list():
     
     sql = """
         SELECT b.*, e.equipment_name, e.location, u.full_name AS student_name, u.roll_number,
+               r.role_name AS user_role,
                p.project_name, approver.full_name AS approver_name
         FROM BOOKINGS b
         JOIN EQUIPMENT e ON b.equipment_id = e.equipment_id
         JOIN USERS u ON b.user_id = u.user_id
+        JOIN ROLES r ON u.role_id = r.role_id
         LEFT JOIN PROJECTS p ON b.project_id = p.project_id
         LEFT JOIN USERS approver ON b.approved_by = approver.user_id
         WHERE 1=1
     """
     params = []
     
-    # If logged in as Student, only show their bookings unless viewing all
+    # If logged in as Student, only show their bookings
     if user and user['role_name'] == 'Student':
         sql += " AND b.user_id = %s"
         params.append(user['user_id'])
@@ -742,23 +744,35 @@ def bookings_list():
         sql += " AND b.status = %s"
         params.append(status_filter)
         
-    sql += " ORDER BY b.booking_date DESC, b.start_time DESC"
+    # Faculty requests are prioritized over Student requests, with Pending items at top
+    sql += """ ORDER BY 
+        CASE WHEN b.status = 'PENDING' THEN 1 ELSE 2 END ASC,
+        CASE WHEN r.role_name = 'Faculty' THEN 1 WHEN r.role_name = 'Student' THEN 2 ELSE 3 END ASC,
+        b.booking_date DESC, b.start_time DESC, b.booking_id DESC"""
     
     bookings = query_db(sql, params)
     equipment = query_db("SELECT equipment_id, equipment_name, status FROM EQUIPMENT ORDER BY equipment_name ASC")
-    students = query_db("SELECT user_id, full_name, roll_number FROM USERS WHERE role_id = 4 ORDER BY full_name ASC")
+    bookable_users = query_db("""
+        SELECT u.user_id, u.full_name, u.roll_number, r.role_name
+        FROM USERS u
+        JOIN ROLES r ON u.role_id = r.role_id
+        WHERE r.role_name IN ('Faculty', 'Student')
+        ORDER BY CASE r.role_name WHEN 'Faculty' THEN 1 ELSE 2 END, u.full_name ASC
+    """)
     projects = query_db("SELECT project_id, project_name FROM PROJECTS WHERE status = 'Active' ORDER BY project_name ASC")
-    faculty = query_db("SELECT user_id, full_name FROM USERS WHERE role_id IN (1, 3) ORDER BY full_name ASC")
     
     return render_template('bookings.html', bookings=bookings, equipment=equipment,
-                           students=students, projects=projects, faculty=faculty, selected_status=status_filter)
+                           bookable_users=bookable_users, projects=projects, selected_status=status_filter)
 
 @app.route('/bookings/create', methods=['POST'])
 @login_required
 def booking_create():
     user = get_current_user()
     eq_id = request.form.get('equipment_id')
-    user_id = request.form.get('user_id') or (user['user_id'] if user else 5)
+    if user and user['role_name'] in ['Student', 'Faculty']:
+        user_id = user['user_id']
+    else:
+        user_id = request.form.get('user_id') or (user['user_id'] if user else 1)
     proj_id = request.form.get('project_id') or None
     b_date = request.form.get('booking_date')
     start_t = request.form.get('start_time')
@@ -770,7 +784,7 @@ def booking_create():
             INSERT INTO BOOKINGS (equipment_id, user_id, project_id, booking_date, start_time, end_time, purpose, status)
             VALUES (%s, %s, %s, %s, %s, %s, %s, 'PENDING')
         """, [eq_id, user_id, proj_id, b_date, start_t, end_t, purpose])
-        flash("Equipment booking requested successfully! Awaiting faculty approval.", 'success')
+        flash("Equipment booking requested successfully! Awaiting Admin / Technician approval.", 'success')
     except Exception as e:
         flash(f"Error creating booking: {str(e)}", 'danger')
         
@@ -780,6 +794,10 @@ def booking_create():
 @login_required
 def booking_update_status(booking_id):
     user = get_current_user()
+    if user and user['role_name'] not in ['Admin', 'Lab Technician']:
+        flash("Unauthorized. Only Admin and Lab Technicians have authority to approve or manage booking requests.", 'danger')
+        return redirect(url_for('bookings_list'))
+
     action = request.form.get('action') # APPROVE, REJECT, START_USE, COMPLETE
     approver_id = user['user_id'] if user else 1
     

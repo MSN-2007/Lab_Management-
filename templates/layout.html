@@ -52,7 +52,7 @@
                     <a href="{{ url_for('bookings_list') }}" class="nav-link {% if request.endpoint == 'bookings_list' %}active{% endif %}">
                         <i class="fa-solid fa-calendar-check"></i>
                         <span>{% if current_user and current_user.role_name == 'Student' %}My Slot Bookings{% else %}Equipment Bookings{% endif %}</span>
-                        {% if pending_bookings_count > 0 and (not current_user or current_user.role_name in ['Admin', 'Faculty']) %}
+                        {% if pending_bookings_count > 0 and (not current_user or current_user.role_name in ['Admin', 'Lab Technician']) %}
                             <span class="badge badge-pending" style="margin-left: auto; padding: 1px 6px; font-size: 10px;">{{ pending_bookings_count }}</span>
                         {% endif %}
                     </a>

@@ -32,7 +32,7 @@
                 <tr>
                     <th>Booking ID</th>
                     <th>Equipment</th>
-                    <th>Student / Researcher</th>
+                    <th>Booked By (Requester)</th>
                     <th>Project</th>
                     <th>Slot Date &amp; Time</th>
                     <th>Purpose / Experiment</th>
@@ -51,8 +51,17 @@
                         <div style="font-size: 11px; color: var(--text-muted);">{{ b.location }}</div>
                     </td>
                     <td>
-                        <div>{{ b.student_name }}</div>
-                        <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">{{ b.roll_number }}</div>
+                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                            <span style="font-weight: 600;">{{ b.student_name }}</span>
+                            {% if b.user_role == 'Faculty' %}
+                                <span class="badge" style="background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); font-size: 10px; padding: 1px 6px;">FACULTY (PRIORITY)</span>
+                            {% elif b.user_role == 'Student' %}
+                                <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); font-size: 10px; padding: 1px 6px;">STUDENT</span>
+                            {% else %}
+                                <span class="badge badge-secondary" style="font-size: 10px; padding: 1px 6px;">{{ b.user_role or 'STAFF' }}</span>
+                            {% endif %}
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">{{ b.roll_number or 'Faculty Member' }}</div>
                     </td>
                     <td style="color: var(--text-secondary);">{{ b.project_name or 'Independent Lab Activity' }}</td>
                     <td style="font-family: var(--font-mono); font-size: 12px;">
@@ -66,31 +75,50 @@
                         <span class="badge badge-{{ b.status.lower().replace('_', '-') }}">{{ b.status }}</span>
                     </td>
                     <td style="text-align: right;">
-                        {% if b.status == 'PENDING' %}
-                            <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex; gap: 4px;">
-                                <input type="hidden" name="action" value="APPROVE">
-                                <button type="submit" class="btn btn-success btn-sm">Approve</button>
-                            </form>
-                            <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex; gap: 4px;">
-                                <input type="hidden" name="action" value="REJECT">
-                                <button type="submit" class="btn btn-danger btn-sm">Reject</button>
-                            </form>
-                        {% elif b.status == 'APPROVED' %}
-                            <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex;">
-                                <input type="hidden" name="action" value="START_USE">
-                                <button type="submit" class="btn btn-primary btn-sm">
-                                    <i class="fa-solid fa-play"></i> Start Session
-                                </button>
-                            </form>
-                        {% elif b.status == 'IN_USE' %}
-                            <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex;">
-                                <input type="hidden" name="action" value="COMPLETE">
-                                <button type="submit" class="btn btn-secondary btn-sm" style="border-color: var(--accent-emerald); color: var(--accent-emerald);">
-                                    <i class="fa-solid fa-check"></i> Mark Returned
-                                </button>
-                            </form>
+                        {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
+                            {% if b.status == 'PENDING' %}
+                                <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex; gap: 4px;">
+                                    <input type="hidden" name="action" value="APPROVE">
+                                    <button type="submit" class="btn btn-success btn-sm" title="Approve booking reservation">
+                                        <i class="fa-solid fa-check"></i> Approve
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex; gap: 4px;">
+                                    <input type="hidden" name="action" value="REJECT">
+                                    <button type="submit" class="btn btn-danger btn-sm" title="Reject booking reservation">
+                                        <i class="fa-solid fa-xmark"></i> Reject
+                                    </button>
+                                </form>
+                            {% elif b.status == 'APPROVED' %}
+                                <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex;">
+                                    <input type="hidden" name="action" value="START_USE">
+                                    <button type="submit" class="btn btn-primary btn-sm">
+                                        <i class="fa-solid fa-play"></i> Start Session
+                                    </button>
+                                </form>
+                            {% elif b.status == 'IN_USE' %}
+                                <form method="POST" action="{{ url_for('booking_update_status', booking_id=b.booking_id) }}" style="display: inline-flex;">
+                                    <input type="hidden" name="action" value="COMPLETE">
+                                    <button type="submit" class="btn btn-secondary btn-sm" style="border-color: var(--accent-emerald); color: var(--accent-emerald);">
+                                        <i class="fa-solid fa-check"></i> Mark Returned
+                                    </button>
+                                </form>
+                            {% else %}
+                                <span style="font-size: 12px; color: var(--text-muted);">&mdash;</span>
+                            {% endif %}
                         {% else %}
-                            <span style="font-size: 12px; color: var(--text-muted);">&mdash;</span>
+                            {# Non-admin/technician view: status-only display #}
+                            {% if b.status == 'PENDING' %}
+                                <span class="badge badge-pending" style="font-size: 11px;">Awaiting Tech/Admin Review</span>
+                            {% elif b.status == 'APPROVED' %}
+                                <span class="badge badge-available" style="font-size: 11px;">Approved</span>
+                            {% elif b.status == 'IN_USE' %}
+                                <span class="badge badge-in_use" style="font-size: 11px;">Active Session</span>
+                            {% elif b.status == 'RETURNED' %}
+                                <span class="badge badge-completed" style="font-size: 11px;">Completed</span>
+                            {% else %}
+                                <span style="font-size: 12px; color: var(--text-muted);">&mdash;</span>
+                            {% endif %}
                         {% endif %}
                     </td>
                 </tr>
@@ -126,12 +154,17 @@
 
                 <div class="grid-2">
                     <div class="form-group">
-                        <label class="form-label">Student / Researcher *</label>
-                        <select name="user_id" required class="form-select">
-                            {% for s in students %}
-                            <option value="{{ s.user_id }}">{{ s.full_name }} ({{ s.roll_number }})</option>
-                            {% endfor %}
-                        </select>
+                        <label class="form-label">Booked For / Requester *</label>
+                        {% if current_user and current_user.role_name in ['Student', 'Faculty'] %}
+                            <input type="hidden" name="user_id" value="{{ current_user.user_id }}">
+                            <input type="text" class="form-control" disabled value="{{ current_user.full_name }} ({{ current_user.role_name }}{% if current_user.roll_number %} - {{ current_user.roll_number }}{% endif %})">
+                        {% else %}
+                            <select name="user_id" required class="form-select">
+                                {% for u in bookable_users %}
+                                <option value="{{ u.user_id }}">{{ u.full_name }} ({{ u.role_name }}{% if u.roll_number %} - {{ u.roll_number }}{% endif %})</option>
+                                {% endfor %}
+                            </select>
+                        {% endif %}
                     </div>
                     <div class="form-group">
                         <label class="form-label">Associated Project</label>
