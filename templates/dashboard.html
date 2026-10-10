@@ -29,9 +29,11 @@
                 <a href="{{ url_for('components_list') }}" class="btn btn-primary btn-sm">
                     <i class="fa-solid fa-plus"></i> Add Component
                 </a>
+                {% if not current_user or current_user.role_name == 'Admin' %}
                 <a href="{{ url_for('users_list') }}" class="btn btn-secondary btn-sm">
                     <i class="fa-solid fa-user-plus"></i> Assign Accounts
                 </a>
+                {% endif %}
             </div>
             {% endif %}
         </div>

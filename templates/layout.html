@@ -78,13 +78,17 @@
                 </li>
                 {% endif %}
 
+                {% if not current_user or current_user.role_name != 'Student' %}
                 <li class="nav-section-title">Administration</li>
+                {% endif %}
+                {% if not current_user or current_user.role_name == 'Admin' %}
                 <li class="nav-item">
                     <a href="{{ url_for('users_list') }}" class="nav-link {% if request.endpoint == 'users_list' %}active{% endif %}">
                         <i class="fa-solid fa-users-gear"></i>
                         <span>User Accounts</span>
                     </a>
                 </li>
+                {% endif %}
                 {% if not current_user or current_user.role_name in ['Admin', 'Lab Technician'] %}
                 <li class="nav-item">
                     <a href="{{ url_for('maintenance_list') }}" class="nav-link {% if request.endpoint == 'maintenance_list' %}active{% endif %}">

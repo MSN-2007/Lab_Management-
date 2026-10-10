@@ -236,6 +236,11 @@ def switch_role(user_id):
 @app.route('/users')
 @login_required
 def users_list():
+    user = get_current_user()
+    if user and user['role_name'] != 'Admin':
+        flash("Access restricted. User Accounts management is restricted to Administrators.", 'danger')
+        return redirect(url_for('dashboard'))
+
     role_filter = request.args.get('role', '')
     search_query = request.args.get('q', '').strip()
     
@@ -266,6 +271,11 @@ def users_list():
 @app.route('/users/add', methods=['POST'])
 @login_required
 def users_add():
+    user = get_current_user()
+    if user and user['role_name'] != 'Admin':
+        flash("Unauthorized. Only Administrators can create accounts.", 'danger')
+        return redirect(url_for('dashboard'))
+
     full_name = request.form.get('full_name', '').strip()
     email = request.form.get('email', '').strip().lower()
     role_id = int(request.form.get('role_id', 4))
@@ -291,6 +301,11 @@ def users_add():
 @app.route('/users/edit/<int:user_id>', methods=['POST'])
 @login_required
 def users_edit(user_id):
+    user = get_current_user()
+    if user and user['role_name'] != 'Admin':
+        flash("Unauthorized. Only Administrators can edit accounts.", 'danger')
+        return redirect(url_for('dashboard'))
+
     full_name = request.form.get('full_name', '').strip()
     email = request.form.get('email', '').strip().lower()
     role_id = int(request.form.get('role_id', 4))
@@ -313,6 +328,11 @@ def users_edit(user_id):
 @app.route('/users/delete/<int:user_id>', methods=['POST'])
 @login_required
 def users_delete(user_id):
+    user = get_current_user()
+    if user and user['role_name'] != 'Admin':
+        flash("Unauthorized. Only Administrators can delete accounts.", 'danger')
+        return redirect(url_for('dashboard'))
+
     curr = session.get('user_id')
     if curr == user_id:
         flash("You cannot delete your own currently active account.", "warning")
